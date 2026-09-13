@@ -1,0 +1,10 @@
+data/breizhcrops_raw/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+*.h5
+*.pt
+*.pth
+sessions/
+results/*.csv
+results/error_analysis.csv

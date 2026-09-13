@@ -1,0 +1,10 @@
+numpy
+pandas
+scikit-learn
+xgboost
+torch
+matplotlib
+statsmodels
+scipy
+breizhcrops
+h5py
