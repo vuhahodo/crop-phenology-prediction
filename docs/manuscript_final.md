@@ -45,7 +45,7 @@ Vegetation phenology extraction has traditionally relied on semi-empirical curve
 
 With the increasing availability of dense satellite constellations like Sentinel-2, deep learning methods have emerged as powerful alternatives for Satellite Image Time Series (SITS) processing [8,15]. Pelletier et al. demonstrated the efficacy of temporal convolutional neural networks (TCNN) for parcel-level classification [4], while bidirectional recurrent architectures (Bi-LSTM) effectively model long-range temporal dependencies in vegetation profiles [12]. More recently, self-attention architectures and Vision Transformers adapted for SITS—such as Pixel-Set Encoders and SITS-ViT—have set state-of-the-art benchmarks for land-cover mapping by capturing complex inter-timestep interactions [5,6]. 
 
-Building upon these foundations, recent studies have explored incorporating external domain priors, such as Day-of-Year (DOY) embeddings or calendar gating, to resolve temporal ambiguities. The present study establishes an open benchmark comparing these broad model families for dense phenological stage segmentation, while conducting a systematic ablation of calendar-aware attention components. Crucially, we treat calendar mechanisms as an empirical ablation rather than asserting a novel, validated inductive mechanism].
+Building upon these foundations, recent studies have explored incorporating external domain priors, such as Day-of-Year (DOY) embeddings or calendar gating [17, 18, 5], to resolve temporal ambiguities. The present study establishes an open benchmark comparing these broad model families for dense phenological stage segmentation, while conducting a systematic ablation of calendar-aware attention components. Crucially, we treat calendar mechanisms as an empirical ablation rather than asserting a novel, validated inductive mechanism.
 
 ---
 
@@ -79,7 +79,19 @@ Under evaluation Protocol A, continuous sequence predictions are deterministical
 - **Peak of Season (POS):** Identified as the date of maximum NDVI observed within the predicted vegetative or reproductive intervals (Classes 1 and 2).
 - **End of Season (EOS):** Decoded at the transition from Class 3 (Senescence) back to Class 0 (Fallow).
 
-Whenever a predicted or true milestone transition is absent in a given season, that season is excluded from the error denominator for that specific milestone. To ensure methodological transparency regarding denominator truncation: SOS and POS achieve a 100% detection rate (valid in all 399 test seasons). A valid true EOS milestone transition, however, is present in exactly 234 of the 399 test seasons (58.6% detection rate). Across all evaluated deep architectures, the models successfully predicted a paired EOS transition in 94.6% to 96.2% of these 234 eligible seasons, confirming that the EOS RMSE denominator remains highly stable across models without significant prediction-dropout bias. Evaluation of EOS RMSE is strictly conditioned on this subset.
+Whenever a predicted or true milestone transition is absent in a given season, that season is excluded from the error denominator for that specific milestone. To ensure methodological transparency regarding denominator truncation: SOS and POS achieve a 100% detection rate (valid in all 399 test seasons). A valid true EOS milestone transition, however, is present in exactly 234 of the 399 test seasons (58.6% detection rate). Across all evaluated deep architectures, the models successfully predicted a paired EOS transition in 94.7% to 96.2% of these 234 eligible seasons (Table 0), confirming that the EOS RMSE denominator remains highly stable across models without significant prediction-dropout bias. Evaluation of EOS RMSE is strictly conditioned on this subset.
+
+**Table 0.** EOS Prediction Coverage (per-model paired prediction rate on the 234 eligible test seasons).
+
+| Model | True EOS | Paired Predictions | Coverage |
+| :--- | :---: | :---: | :---: |
+| **Standard Transformer** | 234 | 223.5 | 95.5% |
+| **Cyclical DOY** | 234 | 221.5 | 94.7% |
+| **Calendar Gate** | 234 | 222.4 | 95.0% |
+| **Scalar Gate** | 234 | 223.4 | 95.5% |
+| **CBA-PhenoNet** | 234 | 225.2 | 96.2% |
+| **CBA-PhenoNet + Residual** | 234 | 224.2 | 95.8% |
+| **CBA-PhenoNet + Disentangled** | 234 | 223.3 | 95.4% |
 
 ---
 
@@ -145,7 +157,7 @@ To evaluate whether the observed variations in Table 3 represent statistically m
 | **CBA-PhenoNet + Residual** | 0.1291 / 0.6453 | 0.0637 / 0.3822 | 0.0132 / 0.0793 | 0.4438 / 1.0000 |
 | **CBA-PhenoNet + Disentangled** | 0.2532 / 0.9934 | 0.1228 / 0.5402 | 0.3605 / 1.0000 | 0.8126 / 1.0000 |
 
-Across all 60 formal comparisons spanning the ten evaluated endpoint families, **zero comparisons demonstrate statistically significant differences** following global Holm adjustment at the $\alpha = 0.05$ threshold. For presentation, Table 4 reports four scientifically central endpoint families; all 60 comparisons were nevertheless included in the global Holm procedure. The minimum observed globally-adjusted $p$-value across the entire 60-comparison experimental suite is $p_{\text{adj}} = 0.0633$ (observed in the Macro-F1 metric for Cyclical DOY, where $p_{\text{raw}} = 0.0106$). Because this minimum adjusted $p$-value remains above $\alpha=0.05$, the empirical evidence does not support the hypothesis that explicit calendar conditioning provides measurable accuracy gains in dense phenology segmentation under clean observational conditions. 
+Across all 60 formal comparisons spanning the ten evaluated endpoint families, **zero comparisons demonstrate statistically significant differences** following global Holm adjustment at the $\alpha = 0.05$ threshold. For concise presentation, Table 4 reports four scientifically central endpoint families; all 60 comparisons were nevertheless retained in the global Holm correction. The minimum observed globally-adjusted $p$-value across the entire 60-comparison experimental suite is $p_{\text{adj}} = 0.0633$ (observed in the Macro-F1 metric for Cyclical DOY, where $p_{\text{raw}} = 0.0106$). Because this minimum adjusted $p$-value remains above the $\alpha=0.05$ threshold, the empirical evidence does not support the hypothesis that explicit calendar conditioning provides measurable accuracy gains in dense phenology segmentation under clean observational conditions. 
 
 While the seed-paired statistical tests capture variance across training trajectories (e.g., initialization and SGD noise), we additionally evaluated test-sample variability via non-parametric bootstrapping (2000 resamples of the 399 test seasons). For each bootstrap iteration, we resampled seasons with replacement, computed global Macro-F1 on the resampled set for each seed, averaged across seeds, and recorded the difference between each variant and the Standard Transformer. This procedure uses the same global Macro-F1 metric as Table 3, ensuring direct comparability. The resulting unadjusted 95% CIs indicate a lack of improvement: Cyclical DOY ($\Delta$F1 = -0.028, 95% CI [-0.034, -0.022]), Calendar Gate ($\Delta$F1 = -0.005, 95% CI [-0.009, -0.001]), Scalar Gate ($\Delta$F1 = -0.005, 95% CI [-0.008, -0.001]), CBA-PhenoNet ($\Delta$F1 = -0.007, 95% CI [-0.0132, +0.0002]), CBA-PhenoNet+Residual ($\Delta$F1 = -0.010, 95% CI [-0.0159, -0.0032]), and CBA-PhenoNet+Disentangled ($\Delta$F1 = -0.009, 95% CI [-0.0145, -0.0027]). Five of six CIs fall entirely below zero, while CBA-PhenoNet marginally includes zero. These bootstrap intervals, which measure test-sample variability but do not account for training-trajectory variance, complement the seed-paired $t$-tests (which do capture training variance but lack power at $N=10$). Together, both analyses are consistent: no calendar-aware variant improves upon the Standard Transformer, while several exhibit a very small degradation in the negative direction ($|\Delta\text{F1}| \leq 0.028$). Equivalence testing was not performed.
 
@@ -251,3 +263,7 @@ Ultimately, by rigorously analyzing evaluation discrepancies and reporting the l
 [15] Jakubauskas, M.E., Legates, D.R., Kastens, J.H.: Harmonic analysis of time-series AVHRR NDVI data. Photogrammetric Engineering & Remote Sensing 67(4), 461–470 (2001).
 
 [16] Defourny, P., Bontemps, S., Bellemans, N., Cara, C., Dedieu, G., Guzzonato, E., Hagolle, O., Inglada, J., Nicola, L., Rabaute, T.: Near real-time agriculture monitoring at national scale at parcel resolution: Performance assessment of the Sen2-Agri automated system in various cropping systems around the world. Remote Sensing of Environment 221, 551–568 (2019).
+
+[17] Rußwurm, M., Körner, M.: Multi-temporal land cover classification with sequential recurrent encoders. ISPRS International Journal of Geo-Information 7(4), 129 (2018).
+
+[18] Yuan, Y., Lin, L., Liu, Q.: SITS-Former: A pre-trained spatio-temporal transformer for satellite image time series. IEEE Transactions on Geoscience and Remote Sensing 60, 1–14 (2022).
