@@ -4,7 +4,7 @@ type: manuscript
 permalink: timeseries-final-crop-phenology/docs/manuscript-final
 ---
 
-# A Temporal Segmentation Benchmark and Calendar-Conditioned Attention for Sentinel-2 NDVI Phenology Extraction on BreizhCrops
+# Do Calendar Priors Improve NDVI Phenology Segmentation? A Multi-Seed Benchmark on BreizhCrops
 
 **Ha Do-Phuc-Vu** [0009-0004-8291-3563]  
 *Faculty of Computer Science, Vietnam - Korea University of Information and Communication Technology (VKU), The University of Danang, Da Nang, Vietnam*  
@@ -23,8 +23,10 @@ We benchmark satellite-based crop phenology extraction from Sentinel-2 Normalize
 
 Satellite vegetation-index time series provide dense, repeated observations of terrestrial canopy dynamics, enabling large-scale monitoring of agro-ecosystem productivity and vegetation phenology. However, extracting discrete phenological milestones (such as the green-up onset (Start of Season, SOS), peak canopy maturity (Peak of Season, POS), and senescence termination (End of Season, EOS)) remains highly sensitive to both the underlying temporal sequence model and the operational evaluation protocol. In this study, we evaluate phenology extraction formulated as a dense four-class sequence labeling task followed by deterministic milestone decoding. Importantly, the target stage labels are algorithmically derived from the identical smoothed NDVI trajectories used as inputs. Consequently, the evaluation measures fidelity to a formalized curve-derivation procedure rather than direct empirical validation against independent, ground-based agronomic field trials.
 
+While rule-based heuristics can robustly extract phenology retrospectively from complete, clean, and optimally smoothed time series, they often struggle with noisy, irregular, or incomplete data typical of persistent cloud cover. Training a parametric sequence model to approximate these rules establishes a foundation for robust, differentiable phenology extraction that can potentially operate online or gracefully handle missing observations.
+
 This investigation addresses two central research questions:
-- **RQ1:** How do modern deep sequential architectures compare against classical tabular models leveraging local causal lags and full-season statistical summaries within a standardized benchmark protocol?
+- **RQ1:** How do modern deep sequential architectures compare against classical tabular models under both causal (online) and retrospective (full-season) information budgets?
 - **RQ2:** To what extent do explicit calendar-conditioned attention mechanisms and seasonal gating priors enhance milestone extraction accuracy over a standard temporal transformer?
 
 To resolve RQ1, we establish a rigorous multi-seed benchmark evaluating causal-lag models, full-season tabular estimators, convolutional networks, recurrent architectures, and self-attention models under identical test partitions. To address RQ2, we conduct an extensive, seed-paired ablation study contrasting six calendar-aware variants directly against a Standard Transformer. Our statistical analysis reveals that after rigorous multiple-comparison adjustment via the Holm procedure, no tested calendar-aware configuration achieves a statistically significant difference in segmentation Macro-F1 or milestone root mean square error (RMSE) across any endpoint family.
@@ -78,20 +80,22 @@ To ensure equitable comparisons while managing computational budgets, model conf
 ### 4.2 Main Architecture Benchmark
 Table 1 presents the overall performance comparison across model families evaluated on test partition Macro-F1. For causal-lag baselines, single-comparison estimates from prior phases are retained; for all full-season tabular and deep sequential architectures, results reflect the mean and sample standard deviation across ten independent seeds under Protocol A. The full-season tabular models incorporate both the complete 73-step NDVI trajectory and 12 seasonal summary features.
 
-**Table 1.** Main benchmark comparison across tabular and deep sequential architectures on the held-out test partition (399 seasons). Performance is reported as Macro-F1 (ten-seed mean ± sample standard deviation, except where single or deterministic runs apply).
+**Table 1.** Main benchmark comparison across tabular and deep sequential architectures on the held-out test partition (399 seasons). Models are categorized into Setting A (Causal/Online, restricted to historical context) and Setting B (Retrospective/Full-Season, utilizing bidirectional context). Performance is reported as Macro-F1 (ten-seed mean ± sample standard deviation, except where single or deterministic runs apply).
 
 | Model Family | Model Architecture | Macro-F1 | Empirical Evidence / Source |
 |:---|:---|:---:|:---|
-| **Causal Tabular** | Random Forest, causal-lag [10] | 0.4205 | Single comparison (`results/comparison_table.csv`) |
+| **Setting A: Causal / Online (Local Context)** | | | |
+| Causal Tabular | Random Forest, causal-lag [10] | 0.4205 | Single comparison (`results/comparison_table.csv`) |
 | | XGBoost, causal-lag [11] | 0.4029 | Single comparison (`results/comparison_table.csv`) |
-| **Full-Season Tabular** | Random Forest, full-season [10] | 0.7154 ± 0.0023 | 10 seeds (`results/tables/b0d_fullseason_protocol_a_per_seed.csv`) |
-| | XGBoost, full-season [11]$^\dagger$ | 0.7477 | Deterministic across seeds; std 0.0000 |
-| **Deep Sequential** | 1D-CNN [4] | 0.6400 ± 0.0132 | 10 seeds (`results/tables/b0d_fullseason_protocol_a_per_seed.csv`) |
-| | Bi-LSTM [12] | 0.8357 ± 0.0082 | 10 seeds (`results/tables/b0d_fullseason_protocol_a_per_seed.csv`) |
+| Causal Deep | 1D-CNN (Causal) [4] | 0.6400 ± 0.0132 | 10 seeds (`results/tables/b0d_fullseason_protocol_a_per_seed.csv`) |
+| **Setting B: Retrospective / Full-Season (Bidirectional Context)** | | | |
+| Full-Season Tabular | Random Forest, full-season [10] | 0.7154 ± 0.0023 | 10 seeds (`results/tables/b0d_fullseason_protocol_a_per_seed.csv`) |
+| | XGBoost, full-season [11]$^\dagger$ | 0.7477 | Deterministic across seeds |
+| Deep Sequential | Bi-LSTM [12] | 0.8357 ± 0.0082 | 10 seeds (`results/tables/b0d_fullseason_protocol_a_per_seed.csv`) |
 | | Standard Transformer | **0.9060 ± 0.0089** | 10 seeds (`results/tables/b0d_ablation_metrics_per_seed.csv`) |
 | | CBA-PhenoNet | 0.8992 ± 0.0187 | 10 seeds (`results/tables/b0d_ablation_metrics_per_seed.csv`) |
 
-$^\dagger$*Footnote on XGBoost full-season determinism:* The B0d seed-level results report exactly 0.7477 for all ten XGBoost seeds, in contrast to an earlier preliminary phase report noting 0.6052. Source code inspection of `src/b0d_fullseason_run.py:86-87` confirms that `random_state=seed` was explicitly provided. However, because row and column subsampling parameters are inactive (`subsample=1.0`, `colsample_bytree=1.0`), gradient boosted tree construction via exact greedy splitting is fully deterministic. All ten seeds produced identical predictions (zero mismatches across 29,127 test timesteps) and identical feature importances (maximum absolute difference 0.0). This value is explicitly reported as a single deterministic result and is not interchangeable with 0.6052.
+$^\dagger$*Footnote on XGBoost full-season determinism:* The benchmark seed-level results report exactly 0.7477 for all ten XGBoost seeds, in contrast to an earlier preliminary phase report noting 0.6052. Source code inspection of `src/b0d_fullseason_run.py:86-87` confirms that `random_state=seed` was explicitly provided. However, because row and column subsampling parameters are inactive (`subsample=1.0`, `colsample_bytree=1.0`), gradient boosted tree construction via exact greedy splitting is fully deterministic. All ten seeds produced identical predictions (zero mismatches across 29,127 test timesteps) and identical feature importances (maximum absolute difference 0.0). This value is explicitly reported as a single deterministic result and is not interchangeable with 0.6052.
 
 *Note on causal-lag baselines:* The causal-lag Random Forest and XGBoost entries are single-run point estimates from a prior comparison phase and therefore lack uncertainty quantification. Their inclusion provides directional context for the magnitude of the causal-to-bidirectional performance gap, but direct statistical comparison with ten-seed deep sequential estimates is not appropriate.
 

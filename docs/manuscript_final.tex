@@ -6,7 +6,7 @@
 
 \begin{document}
 
-\title{A Temporal Segmentation Benchmark and Calendar-Conditioned Attention for Sentinel-2 NDVI Phenology Extraction on BreizhCrops}
+\title{Do Calendar Priors Improve NDVI Phenology Segmentation? A Multi-Seed Benchmark on BreizhCrops}
 \titlerunning{Temporal Segmentation Benchmark for Sentinel-2 NDVI Phenology}
 \author{Ha Do-Phuc-Vu\orcidID{0009-0004-8291-3563}}
 \authorrunning{H. Do-Phuc-Vu}
@@ -23,9 +23,11 @@ We benchmark satellite-based crop phenology extraction from Sentinel-2 Normalize
 \section{Introduction}
 Satellite vegetation-index time series provide dense, repeated observations of terrestrial canopy dynamics, enabling large-scale monitoring of agro-ecosystem productivity and vegetation phenology. However, extracting discrete phenological milestones (such as the green-up onset (Start of Season, SOS), peak canopy maturity (Peak of Season, POS), and senescence termination (End of Season, EOS)) remains highly sensitive to both the underlying temporal sequence model and the operational evaluation protocol. In this study, we evaluate phenology extraction formulated as a dense four-class sequence labeling task followed by deterministic milestone decoding. Importantly, the target stage labels are algorithmically derived from the identical smoothed NDVI trajectories used as inputs. Consequently, the evaluation measures fidelity to a formalized curve-derivation procedure rather than direct empirical validation against independent, ground-based agronomic field trials.
 
+While rule-based heuristics can robustly extract phenology retrospectively from complete, clean, and optimally smoothed time series, they often struggle with noisy, irregular, or incomplete data typical of persistent cloud cover. Training a parametric sequence model to approximate these rules establishes a foundation for robust, differentiable phenology extraction that can potentially operate online or gracefully handle missing observations.
+
 This investigation addresses two central research questions:
 \begin{itemize}
-    \item \textbf{RQ1:} How do modern deep sequential architectures compare against classical tabular models leveraging local causal lags and full-season statistical summaries within a standardized benchmark protocol?
+    \item \textbf{RQ1:} How do modern deep sequential architectures compare against classical tabular models under both causal (online) and retrospective (full-season) information budgets?
     \item \textbf{RQ2:} To what extent do explicit calendar-conditioned attention mechanisms and seasonal gating priors enhance milestone extraction accuracy over a standard temporal transformer?
 \end{itemize}
 
@@ -78,25 +80,27 @@ Table \ref{tab:main_benchmark} presents the overall performance comparison acros
 
 \begin{table}[h!]
 \centering
-\caption{Main benchmark comparison across tabular and deep sequential architectures on the held-out test partition (399 seasons). Performance is reported as Macro-F1 (ten-seed mean $\pm$ sample standard deviation, except where single or deterministic runs apply).}
+\caption{Main benchmark comparison across tabular and deep sequential architectures on the held-out test partition (399 seasons). Models are categorized into Setting A (Causal/Online, restricted to historical context) and Setting B (Retrospective/Full-Season, utilizing bidirectional context). Performance is reported as Macro-F1 (ten-seed mean $\pm$ sample standard deviation, except where single or deterministic runs apply).}
 \label{tab:main_benchmark}
 \resizebox{\textwidth}{!}{
 \begin{tabular}{@{}llcl@{}}
 \toprule
 \textbf{Model Family} & \textbf{Model Architecture} & \textbf{Macro-F1} & \textbf{Empirical Evidence} \\ \midrule
+\multicolumn{4}{l}{\textit{Setting A: Causal / Online (Local Context)}} \\
 \textbf{Causal Tabular} & Random Forest, causal-lag \cite{randomforest} & 0.4205 & Single comparison \\
- & XGBoost, causal-lag \cite{xgboost} & 0.4029 & Single comparison \\ \midrule
+ & XGBoost, causal-lag \cite{xgboost} & 0.4029 & Single comparison \\
+\textbf{Causal Deep} & 1D-CNN (Causal) \cite{pelletier} & $0.6400 \pm 0.0132$ & 10 seeds \\ \midrule
+\multicolumn{4}{l}{\textit{Setting B: Retrospective / Full-Season (Bidirectional Context)}} \\
 \textbf{Full-Season Tabular} & Random Forest, full-season \cite{randomforest} & $0.7154 \pm 0.0023$ & 10 seeds \\
- & XGBoost, full-season \cite{xgboost}$^\dagger$ & 0.7477 & Deterministic across seeds; std 0.0000 \\ \midrule
-\textbf{Deep Sequential} & 1D-CNN \cite{pelletier} & $0.6400 \pm 0.0132$ & 10 seeds \\
- & Bi-LSTM \cite{bilstm} & $0.8357 \pm 0.0082$ & 10 seeds \\
+ & XGBoost, full-season \cite{xgboost}$^\dagger$ & 0.7477 & Deterministic across seeds \\
+\textbf{Deep Sequential} & Bi-LSTM \cite{bilstm} & $0.8357 \pm 0.0082$ & 10 seeds \\
  & Standard Transformer & $\mathbf{0.9060 \pm 0.0089}$ & 10 seeds \\
  & CBA-PhenoNet & $0.8992 \pm 0.0187$ & 10 seeds \\ \bottomrule
 \end{tabular}
 }
 \end{table}
 
-\noindent \textit{$^\dagger$Footnote on XGBoost full-season determinism:} The B0d seed-level results report exactly 0.7477 for all ten XGBoost seeds, in contrast to an earlier preliminary phase report noting 0.6052. Source code inspection confirms that \texttt{random\_state=seed} was explicitly provided. However, because row and column subsampling parameters are inactive (\texttt{subsample=1.0}, \texttt{colsample\_bytree=1.0}), gradient boosted tree construction via exact greedy splitting is fully deterministic. All ten seeds produced identical predictions (zero mismatches across 29,127 test timesteps) and identical feature importances (maximum absolute difference 0.0). This value is explicitly reported as a single deterministic result and is not interchangeable with 0.6052.
+\noindent \textit{$^\dagger$Footnote on XGBoost full-season determinism:} The benchmark seed-level results report exactly 0.7477 for all ten XGBoost seeds, in contrast to an earlier preliminary phase report noting 0.6052. Source code inspection confirms that \texttt{random\_state=seed} was explicitly provided. However, because row and column subsampling parameters are inactive (\texttt{subsample=1.0}, \texttt{colsample\_bytree=1.0}), gradient boosted tree construction via exact greedy splitting is fully deterministic. All ten seeds produced identical predictions (zero mismatches across 29,127 test timesteps) and identical feature importances (maximum absolute difference 0.0). This value is explicitly reported as a single deterministic result and is not interchangeable with 0.6052.
 
 \noindent \textit{Note on causal-lag baselines:} The causal-lag Random Forest and XGBoost entries are single-run point estimates from a prior comparison phase and therefore lack uncertainty quantification. Their inclusion provides directional context for the magnitude of the causal-to-bidirectional performance gap, but direct statistical comparison with ten-seed deep sequential estimates is not appropriate.
 
@@ -154,8 +158,10 @@ To contextualize the benchmark performance and respond to the need for robust mu
 \paragraph{Exploratory Data Analysis (EDA):}
 Analysis of the ground-truth milestone distributions reveals distinct temporal patterns. The Peak of Season (POS) is highly concentrated around the middle of the calendar year, reflecting a standard single-harvest agricultural cycle. Conversely, the Start of Season (SOS) and End of Season (EOS) exhibit wider variance, with long tails indicating heterogeneous planting and harvesting schedules across different crop types in the BreizhCrops dataset. This variance explains why POS prediction consistently yields the lowest errors across all models.
 
-\paragraph{Extended Milestone Metrics:}
+\paragraph{Extended Milestone Metrics and Naive POS Baseline:}
 Table \ref{tab:extended_metrics} presents a comprehensive metric suite for the CBA-PhenoNet model. Because the input sequence is regularized to 5-day intervals (73 timesteps), milestone predictions are inherently discretized. Consequently, tolerances such as Accuracy $\pm 1$ day or $\pm 3$ days are mathematically equivalent to exact-match accuracy at the 5-day resolution. POS achieves exceptional prediction fidelity (MAE $1.9$ days, $R^2$ $0.974$, exact-match Accuracy $98.4\%$). SOS and EOS show higher median absolute errors (MedAE $5.0$ and $0.0$ respectively) and lower $R^2$ ($0.870$ and $0.912$), reflecting the ambiguity of onset and senescence phases.
+
+Crucially, the decoding heuristic for POS merely selects the maximum NDVI timestamp within the predicted active classes. To quantify how much of the POS accuracy is attributable to the sequence model versus the deterministic heuristic, we evaluated a \textit{Naive POS baseline} ($POS_{naive} = \arg\max_t NDVI_t$) across the entire test set. The naive baseline achieves a perfect MAE of 0.00 days (100\% exact-match accuracy). This exploratory finding confirms that detecting the absolute POS requires no temporal sequence modeling on cleanly smoothed trajectories; the neural network's contribution is strictly limited to identifying the broader vegetative and senescence intervals.
 
 \begin{table}[h!]
 \centering
