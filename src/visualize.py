@@ -25,7 +25,7 @@ from sklearn.metrics import r2_score
 PREDICTIONS_DIR = Path(__file__).resolve().parent.parent / "results" / "predictions"
 PLOTS_DIR = Path(__file__).resolve().parent.parent / "results" / "plots"
 
-MILESTONE_LABELS = {"sos": "SOS (Sowing)", "pos": "POS (Peak/Flowering)", "eos": "EOS (Harvest)"}
+MILESTONE_LABELS = {"sos": "SOS (Green-up / 20% Thresh)", "pos": "POS (Canopy Peak)", "eos": "EOS (Senescence / 20% Thresh)"}
 MILESTONE_COLORS = {"sos": "#4C72B0", "pos": "#DD8452", "eos": "#55A868"}
 
 
@@ -74,7 +74,8 @@ def plot_actual_vs_predicted(model_name: str, milestone: str | None = None) -> l
             ax.set_title(f"{MILESTONE_LABELS[m]}\n(no data)")
             continue
         _scatter_with_identity_line(ax, sub["true_doy"], sub["pred_doy"], MILESTONE_COLORS[m], MILESTONE_LABELS[m])
-    fig.suptitle(f"Actual vs. Predicted phenology dates -- {model_name}", fontsize=13)
+    display_model_name = "CBA-PhenoNet" if model_name == "cba_phenonet" else model_name.upper()
+    fig.suptitle(f"Actual vs. Predicted Phenological Transition Dates -- {display_model_name}", fontsize=13)
     fig.tight_layout()
     combined_path = PLOTS_DIR / f"{model_name}_actual_vs_predicted.png"
     fig.savefig(combined_path, dpi=150)

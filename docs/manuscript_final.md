@@ -1,0 +1,229 @@
+---
+title: manuscript_final
+type: manuscript
+permalink: timeseries-final-crop-phenology/docs/manuscript-final
+---
+
+# A Temporal Segmentation Benchmark and Calendar-Conditioned Attention for Sentinel-2 NDVI Phenology Extraction on BreizhCrops
+
+**Ha Do-Phuc-Vu** [0009-0004-8291-3563]  
+*Faculty of Computer Science, Vietnam - Korea University of Information and Communication Technology (VKU), The University of Danang, Da Nang, Vietnam*  
+*hadpv.23ai@vku.udn.vn*
+
+---
+
+### Abstract
+We benchmark satellite-based crop phenology extraction from Sentinel-2 Normalized Difference Vegetation Index (NDVI) sequences framed as dense four-class temporal segmentation. Under this formulation, key phenological milestones (Start of Season (SOS), Peak of Season (POS), and End of Season (EOS)) are deterministically decoded from continuous sequence predictions. Evaluating across a held-out test partition of 399 quality-filtered seasons resampled to 73 regularized five-day intervals, we compare classical tabular baselines and modern deep sequential architectures under a unified ten-seed protocol (Protocol A). The empirical benchmark establishes that sequential models substantially outperform local causal-lag tabular baselines (Random Forest Macro-F1 0.4205, XGBoost 0.4029), with full-season tabular baselines reaching 0.7154 ± 0.0023 for Random Forest and 0.7477 for XGBoost (deterministic across seeds; std 0.0000), while deep architectures achieve 0.6400 ± 0.0132 (1D-CNN), 0.8357 ± 0.0082 (Bi-LSTM), 0.8992 ± 0.0187 (CBA-PhenoNet), and 0.9060 ± 0.0089 (Standard Transformer). Furthermore, an independent, seed-paired ablation of six calendar-aware variants against the Standard Transformer indicates that no calendar-conditioning mechanism yields a statistically significant improvement after global Holm adjustment. Complementary season-level bootstrap analysis is consistent with these findings, with most variants exhibiting small negative performance differences in the same direction ($\Delta$F1 from $-0.005$ to $-0.028$). Finally, we contextualize these findings by documenting critical methodological pitfalls encountered in phenology benchmarking (checkpoint reuse, channel-masking dropout artifacts, milestone-denominator truncation, and double-logistic convergence boundaries), emphasizing that derived labels constitute pseudo-ground-truth rather than in-situ agronomic observations.
+
+**Keywords:** Crop phenology · Sentinel-2 · NDVI · Temporal segmentation · BreizhCrops · Benchmark · Ablation study.
+
+---
+
+## 1 Introduction
+
+Satellite vegetation-index time series provide dense, repeated observations of terrestrial canopy dynamics, enabling large-scale monitoring of agro-ecosystem productivity and vegetation phenology. However, extracting discrete phenological milestones (such as the green-up onset (Start of Season, SOS), peak canopy maturity (Peak of Season, POS), and senescence termination (End of Season, EOS)) remains highly sensitive to both the underlying temporal sequence model and the operational evaluation protocol. In this study, we evaluate phenology extraction formulated as a dense four-class sequence labeling task followed by deterministic milestone decoding. Importantly, the target stage labels are algorithmically derived from the identical smoothed NDVI trajectories used as inputs. Consequently, the evaluation measures fidelity to a formalized curve-derivation procedure rather than direct empirical validation against independent, ground-based agronomic field trials.
+
+This investigation addresses two central research questions:
+- **RQ1:** How do modern deep sequential architectures compare against classical tabular models leveraging local causal lags and full-season statistical summaries within a standardized benchmark protocol?
+- **RQ2:** To what extent do explicit calendar-conditioned attention mechanisms and seasonal gating priors enhance milestone extraction accuracy over a standard temporal transformer?
+
+To resolve RQ1, we establish a rigorous multi-seed benchmark evaluating causal-lag models, full-season tabular estimators, convolutional networks, recurrent architectures, and self-attention models under identical test partitions. To address RQ2, we conduct an extensive, seed-paired ablation study contrasting six calendar-aware variants directly against a Standard Transformer. Our statistical analysis reveals that after rigorous multiple-comparison adjustment via the Holm procedure, no tested calendar-aware configuration achieves a statistically significant difference in segmentation Macro-F1 or milestone root mean square error (RMSE) across any endpoint family.
+
+The primary contributions of this work are fourfold:
+1. **Systematic Benchmark:** A standardized empirical comparison of tabular baselines and deep sequential models across 399 held-out seasons from the BreizhCrops dataset.
+2. **Unified Evaluation Protocol:** A shared dense temporal segmentation framework with deterministic milestone decoding (Protocol A) ensuring equitable model comparisons.
+3. **Calendar-Aware Ablation Analysis:** A rigorous ten-seed, seven-configuration ablation isolating the empirical impact of cyclical Day-of-Year (DOY) encodings, calendar gating, residual connections, and disentangled attention.
+4. **Methodological Disclosures:** Detailed documentation of four subtle protocol pitfalls encountered during pipeline execution: silent checkpoint reuse, multi-channel dropout errors, milestone denominator selection effects, and double-logistic boundary clamping.
+
+---
+
+## 2 Related Work
+
+Vegetation phenology extraction has traditionally relied on semi-empirical curve fitting and temporal filtering techniques applied to satellite sensor series. Foundational frameworks such as TIMESAT utilize asymmetric Gaussian or double-logistic functions to smooth seasonal noise and derive onset dates via dynamic amplitude thresholds [1–3,7,13]. While computationally efficient and readily interpretable, these parametric methods assume idealized unimodal trajectories, often struggling to capture asymmetric profiles or overwintering crop dynamics [9,14].
+
+With the increasing availability of dense satellite constellations like Sentinel-2, deep learning methods have emerged as powerful alternatives for Satellite Image Time Series (SITS) processing [8,15]. Pelletier et al. demonstrated the efficacy of temporal convolutional neural networks (TCNN) for parcel-level classification [4], while bidirectional recurrent architectures (Bi-LSTM) effectively model long-range temporal dependencies in vegetation profiles [12]. More recently, self-attention architectures and Vision Transformers adapted for SITS—such as Pixel-Set Encoders and SITS-ViT—have set state-of-the-art benchmarks for land-cover mapping by capturing complex inter-timestep interactions [5,6]. 
+
+Building upon these foundations, recent studies have explored incorporating external domain priors, such as Day-of-Year (DOY) embeddings or calendar gating, to resolve temporal ambiguities. The present study establishes an open benchmark comparing these broad model families for dense phenological stage segmentation, while conducting a systematic ablation of calendar-aware attention components. Crucially, we treat calendar mechanisms as an empirical ablation rather than asserting a novel, validated inductive mechanism].
+
+---
+
+## 3 Data and Evaluation Protocol
+
+### 3.1 Dataset Partitioning and Target Derivation
+All experiments are conducted using the BreizhCrops dataset, focusing on the `frh01` (Ille-et-Vilaine, France) 2017 partition and evaluating on 399 held-out test parcel seasons. Each agricultural season is regularized onto 73 five-day temporal steps, spanning the full annual vegetative cycle.
+
+The target labels represent four distinct phenological stages:
+- **Class 0:** Fallow / Bare Soil
+- **Class 1:** Vegetative Growth
+- **Class 2:** Reproductive / Peak Canopy
+- **Class 3:** Senescence / Maturation
+
+These sequence labels are generated from smoothed NDVI series using a 20% seasonal amplitude threshold. As emphasized in Section 1, because these labels are derived from the input signal itself, they constitute algorithmic pseudo-ground-truth rather than in-situ agronomic observations.
+
+### 3.2 Protocol A Decoding
+Under evaluation Protocol A, continuous sequence predictions are deterministically decoded into discrete calendar milestone days:
+- **Start of Season (SOS):** Decoded at the first temporal transition from Class 0 (Fallow) to Class 1 (Vegetative).
+- **Peak of Season (POS):** Identified as the date of maximum NDVI observed within the predicted vegetative or reproductive intervals (Classes 1 and 2).
+- **End of Season (EOS):** Decoded at the transition from Class 3 (Senescence) back to Class 0 (Fallow).
+
+Whenever a predicted or true milestone transition is absent in a given season, that season is excluded from the error denominator for that specific milestone. Notably, while SOS and POS are identifiable in all 399 test seasons, a valid true EOS milestone transition is present in exactly 234 of the 399 test seasons.
+
+---
+
+## 4 Experimental Results
+
+### 4.1 Hyperparameter Configuration
+To ensure equitable comparisons while managing computational budgets, model configurations varied between baseline and deep architectures. For causal-lag machine learning baselines, hyperparameters were determined via a 50-trial randomized search over a predefined validation space. Conversely, full-season tabular baselines utilized fixed, unoptimized configurations (e.g., 300 estimators, maximum depth of 6). Across all tabular experiments, the Random Forest classifier explicitly utilized class weighting (`class_weight="balanced"`) to mitigate class imbalance, whereas the XGBoost implementation did not include explicit class weighting. For the deep sequential (1D-CNN, Bi-LSTM) and self-attention architectures, hyperparameters (including learning rate, batch size, dropout, and hidden dimensionality) were fixed to standard literature defaults or starting values to evaluate intrinsic architectural inductive biases rather than exhaustive hyperparameter tuning. All deep models were optimized using Adam with a learning rate of 0.001 and batch size of 32, training for up to 150 epochs with early stopping based on validation Macro-F1.
+
+### 4.2 Main Architecture Benchmark
+Table 1 presents the overall performance comparison across model families evaluated on test partition Macro-F1. For causal-lag baselines, single-comparison estimates from prior phases are retained; for all full-season tabular and deep sequential architectures, results reflect the mean and sample standard deviation across ten independent seeds under Protocol A. The full-season tabular models incorporate both the complete 73-step NDVI trajectory and 12 seasonal summary features.
+
+**Table 1.** Main benchmark comparison across tabular and deep sequential architectures on the held-out test partition (399 seasons). Performance is reported as Macro-F1 (ten-seed mean ± sample standard deviation, except where single or deterministic runs apply).
+
+| Model Family | Model Architecture | Macro-F1 | Empirical Evidence / Source |
+|:---|:---|:---:|:---|
+| **Causal Tabular** | Random Forest, causal-lag [10] | 0.4205 | Single comparison (`results/comparison_table.csv`) |
+| | XGBoost, causal-lag [11] | 0.4029 | Single comparison (`results/comparison_table.csv`) |
+| **Full-Season Tabular** | Random Forest, full-season [10] | 0.7154 ± 0.0023 | 10 seeds (`results/tables/b0d_fullseason_protocol_a_per_seed.csv`) |
+| | XGBoost, full-season [11]$^\dagger$ | 0.7477 | Deterministic across seeds; std 0.0000 |
+| **Deep Sequential** | 1D-CNN [4] | 0.6400 ± 0.0132 | 10 seeds (`results/tables/b0d_fullseason_protocol_a_per_seed.csv`) |
+| | Bi-LSTM [12] | 0.8357 ± 0.0082 | 10 seeds (`results/tables/b0d_fullseason_protocol_a_per_seed.csv`) |
+| | Standard Transformer | **0.9060 ± 0.0089** | 10 seeds (`results/tables/b0d_ablation_metrics_per_seed.csv`) |
+| | CBA-PhenoNet | 0.8992 ± 0.0187 | 10 seeds (`results/tables/b0d_ablation_metrics_per_seed.csv`) |
+
+$^\dagger$*Footnote on XGBoost full-season determinism:* The B0d seed-level results report exactly 0.7477 for all ten XGBoost seeds, in contrast to an earlier preliminary phase report noting 0.6052. Source code inspection of `src/b0d_fullseason_run.py:86-87` confirms that `random_state=seed` was explicitly provided. However, because row and column subsampling parameters are inactive (`subsample=1.0`, `colsample_bytree=1.0`), gradient boosted tree construction via exact greedy splitting is fully deterministic. All ten seeds produced identical predictions (zero mismatches across 29,127 test timesteps) and identical feature importances (maximum absolute difference 0.0). This value is explicitly reported as a single deterministic result and is not interchangeable with 0.6052.
+
+*Note on causal-lag baselines:* The causal-lag Random Forest and XGBoost entries are single-run point estimates from a prior comparison phase and therefore lack uncertainty quantification. Their inclusion provides directional context for the magnitude of the causal-to-bidirectional performance gap, but direct statistical comparison with ten-seed deep sequential estimates is not appropriate.
+
+As shown in Table 1, bidirectional sequence modeling provides substantial advantages over local causal-lag formulations, raising Macro-F1 from ~0.40–0.42 to >0.83–0.90. Full-season summary statistics notably improve tabular performance (0.7154–0.7477), narrowing but not closing the gap to deep attention-based architectures, which achieve the strongest overall segmentation fidelity (0.8992–0.9060).
+
+---
+
+### 4.3 Calendar-Aware Ablation Study
+To investigate RQ2, we systematically ablate calendar-conditioning mechanisms across seven distinct configurations over ten seeds. Table 2 summarizes the resulting stage segmentation Macro-F1 and decoded milestone estimation errors (RMSE in days) for SOS, POS, and EOS.
+
+**Table 2.** Ten-seed ablation metrics (mean ± sample standard deviation) across calendar-aware variants on the 399-season test partition.
+
+| Configuration | Macro-F1 | SOS RMSE (days) | POS RMSE (days) | EOS RMSE (days) |
+|:---|:---:|:---:|:---:|:---:|
+| **Standard Transformer** | **0.9060 ± 0.0089** | 35.98 ± 4.92 | 25.70 ± 6.48 | 29.22 ± 5.15 |
+| Cyclical DOY | 0.8777 ± 0.0290 | 39.19 ± 10.33 | 18.86 ± 7.97 | 30.44 ± 8.14 |
+| Calendar Gate | 0.9011 ± 0.0137 | 36.86 ± 8.03 | 26.65 ± 7.44 | 26.19 ± 5.11 |
+| Scalar Gate | 0.9013 ± 0.0149 | 36.51 ± 6.27 | 27.67 ± 6.14 | 27.14 ± 6.92 |
+| CBA-PhenoNet | 0.8992 ± 0.0187 | 31.63 ± 6.29 | 17.54 ± 7.14 | **25.10 ± 5.17** |
+| CBA-PhenoNet + Residual | 0.8962 ± 0.0133 | **31.20 ± 6.77** | **15.98 ± 8.38** | 28.12 ± 4.14 |
+| CBA-PhenoNet + Disentangled | 0.8972 ± 0.0199 | 33.23 ± 3.96 | 23.24 ± 4.81 | 28.50 ± 5.48 |
+
+To evaluate whether the observed variations in Table 2 represent statistically meaningful improvements, each calendar-aware variant was evaluated against the Standard Transformer using seed-paired two-sided $t$-tests. Multiple-testing correction was conducted globally across all 60 comparisons spanning ten endpoint families using the Holm-Bonferroni step-down procedure. Furthermore, we computed per-season Macro-F1 differences between the Standard Transformer and each variant across all 399 test seasons, using non-parametric bootstrapping (2000 resamples) to estimate 95% confidence intervals and seed-level Cohen's $d$ effect sizes. The results for the primary endpoints are detailed in Table 3.
+
+**Table 3.** Seed-paired hypothesis testing against the Standard Transformer across four endpoint families ($N=10$ paired seeds). Reported values show unadjusted raw $p$-values ($p_{\text{raw}}$) and family-wise Holm-adjusted $p$-values ($p_{\text{adj}}$).
+
+| Configuration vs. Standard Transformer | Macro-F1 ($p_{\text{raw}} \,/\, p_{\text{adj}}$) | SOS RMSE ($p_{\text{raw}} \,/\, p_{\text{adj}}$) | POS RMSE ($p_{\text{raw}} \,/\, p_{\text{adj}}$) | EOS RMSE ($p_{\text{raw}} \,/\, p_{\text{adj}}$) |
+|:---|:---:|:---:|:---:|:---:|
+| **Cyclical DOY** | 0.0106 / 0.0633 | 0.3774 / 1.0000 | 0.0933 / 0.3730 | 0.7131 / 1.0000 |
+| **Calendar Gate** | 0.4214 / 0.9934 | 0.8046 / 1.0000 | 0.7187 / 1.0000 | 0.2451 / 1.0000 |
+| **Scalar Gate** | 0.2726 / 0.9934 | 0.8345 / 1.0000 | 0.4461 / 1.0000 | 0.4452 / 1.0000 |
+| **CBA-PhenoNet** | 0.2484 / 0.9934 | 0.1080 / 0.5402 | 0.0283 / 0.1414 | 0.1421 / 0.8524 |
+| **CBA-PhenoNet + Residual** | 0.1291 / 0.6453 | 0.0637 / 0.3822 | 0.0132 / 0.0793 | 0.4438 / 1.0000 |
+| **CBA-PhenoNet + Disentangled** | 0.2532 / 0.9934 | 0.1228 / 0.5402 | 0.3605 / 1.0000 | 0.8126 / 1.0000 |
+
+Across all 60 formal comparisons spanning the ten evaluated endpoint families, **zero comparisons demonstrate statistically significant differences** following global Holm adjustment at the $\alpha = 0.05$ threshold. The 4 primary families presented in Table 3 were selected post-hoc for concise reporting, while the remaining 6 auxiliary count-based families were treated as exploratory. The minimum observed globally-adjusted $p$-value across the entire 60-comparison experimental suite is $p_{\text{adj}} = 0.0633$ (observed in the Macro-F1 metric for Cyclical DOY, where $p_{\text{raw}} = 0.0106$). Because this minimum significant result fails to reach significance under global adjustment, the empirical evidence does not support the hypothesis that explicit calendar conditioning provides measurable accuracy gains in dense phenology segmentation under clean observational conditions. 
+
+While the seed-paired statistical tests capture variance across training trajectories (e.g., initialization and SGD noise), we additionally evaluated test-sample variability via non-parametric bootstrapping (2000 resamples of the 399 test seasons). For each bootstrap iteration, we resampled seasons with replacement, computed global Macro-F1 on the resampled set for each seed, averaged across seeds, and recorded the difference between each variant and the Standard Transformer. This procedure uses the same global Macro-F1 metric as Table 2, ensuring direct comparability. The resulting unadjusted 95% CIs indicate a lack of improvement: Cyclical DOY ($\Delta$F1 = -0.028, 95% CI [-0.034, -0.022]), Calendar Gate ($\Delta$F1 = -0.005, 95% CI [-0.009, -0.001]), Scalar Gate ($\Delta$F1 = -0.005, 95% CI [-0.008, -0.001]), CBA-PhenoNet ($\Delta$F1 = -0.007, 95% CI [-0.0132, +0.0002]), CBA-PhenoNet+Residual ($\Delta$F1 = -0.010, 95% CI [-0.0159, -0.0032]), and CBA-PhenoNet+Disentangled ($\Delta$F1 = -0.009, 95% CI [-0.0145, -0.0027]). Five of six CIs fall entirely below zero, while CBA-PhenoNet marginally includes zero. These bootstrap intervals, which measure test-sample variability but do not account for training-trajectory variance, complement the seed-paired $t$-tests (which do capture training variance but lack power at $N=10$). Together, both analyses are consistent: no calendar-aware variant improves upon the Standard Transformer, while several exhibit a very small degradation in the negative direction ($|\Delta\text{F1}| \leq 0.028$). Equivalence testing was not performed.
+
+### 4.4 Exploratory Data Analysis and Error Diagnostics
+To contextualize the benchmark performance and respond to the need for robust multidimensional evaluation, we expand beyond Macro-F1 and RMSE by incorporating Exploratory Data Analysis (EDA) and extended milestone metrics (MAE, MedAE, MAPE, $R^2$, and Accuracy). 
+
+**Exploratory Data Analysis (EDA):**
+Analysis of the ground-truth milestone distributions (Figure 2, right) reveals distinct temporal patterns. The Peak of Season (POS) is highly concentrated around the middle of the calendar year, reflecting a standard single-harvest agricultural cycle. Conversely, the Start of Season (SOS) and End of Season (EOS) exhibit wider variance, with long tails indicating heterogeneous planting and harvesting schedules across different crop types in the BreizhCrops dataset. This variance explains why POS prediction consistently yields the lowest errors across all models.
+
+**Extended Milestone Metrics:**
+Table 4 presents a comprehensive metric suite for the CBA-PhenoNet model. Because the input sequence is regularized to 5-day intervals (73 timesteps), milestone predictions are inherently discretized. Consequently, tolerances such as Accuracy $\pm 1$ day or $\pm 3$ days are mathematically equivalent to exact-match accuracy at the 5-day resolution. POS achieves exceptional prediction fidelity (MAE $1.9$ days, $R^2$ $0.974$, exact-match Accuracy $98.4\%$). SOS and EOS show higher median absolute errors (MedAE $5.0$ and $0.0$ respectively) and lower $R^2$ ($0.870$ and $0.912$), reflecting the ambiguity of onset and senescence phases.
+
+**Table 4.** Extended evaluation metrics for milestone decoding (CBA-PhenoNet, pooled across 10 seeds). Acc$\pm3$ is equivalent to exact-match accuracy due to 5-day temporal discretization. Note: RMSE values here are calculated globally across concatenated predictions, distinguishing them from Table 2 which reports the mean of per-seed RMSEs.
+
+| Milestone | MAE (days) | MedAE (days) | MAPE (%) | $R^2$ | Acc$\pm3$ (%) | RMSE (days) |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| SOS | 11.93 | 5.0 | 9.94 | 0.870 | 48.5 | 27.11 |
+| POS | 1.91 | 0.0 | 1.66 | 0.974 | 98.4 | 18.80 |
+| EOS | 7.12 | 0.0 | 3.91 | 0.912 | 63.2 | 25.54 |
+
+**Error Analysis and Visualization:**
+Figure 2 (left) provides a visualization of Actual versus Predicted milestones. While predictions tightly follow the identity line (particularly for POS), sparse off-diagonal clusters indicate severe misclassifications. We quantify large errors as absolute deviations exceeding 30 days. For POS, only 1.5% of predictions suffer large errors. However, SOS exhibits large errors in 11.4% of cases (mean absolute error of these cases: 60.4 days), with the vast majority (230/288) being predicted prematurely (early). Similarly, EOS suffers large errors in 5.5% of predictions (mean 79.5 days), also skewing early. These premature detections frequently correspond to anomalous early-season green-up events (e.g., weeds or cover crops) that temporarily surpass the algorithmic amplitude threshold.
+
+![Actual vs. Predicted DOY for SOS, POS, and EOS using CBA-PhenoNet.](figures/actual_vs_predicted.png)
+![True Distribution of milestones.](figures/eda_distribution.png)
+
+---
+
+## 5 Discussion and Methodological Insights
+
+The empirical benchmark confirms that sequence-level representations effectively capture temporal vegetation dynamics, outperforming local causal-lag predictors. However, our ablation analysis demonstrates that calendar-aware mechanisms (including periodic positional encodings and calendar gating priors) do not yield statistically distinguishable performance gains over a Standard Transformer on clean Sentinel-2 sequences. Crucially, rigorous reporting requires transparent disclosure of experimental caveats and procedural artifacts.
+
+### 5.1 Protocol Pitfalls: A Cautionary Tale
+In the course of conducting and auditing this benchmark, four critical methodological pitfalls were identified, providing valuable lessons for remote sensing time-series pipelines:
+
+1. **Silent Checkpoint Reuse:** In earlier training iterations, an automated execution check skipped model fitting whenever a checkpoint file already existed on disk (`if save_path.exists(): continue`). As a consequence, exploratory reruns silently evaluated stale model weights rather than the newly specified configurations. All final benchmark estimates reported herein were verified through independent execution from clean initialization.
+2. **Multi-Channel Dropout Corruption:** An initial stress-test implementation designed to simulate missing data masked entire input channels across corrupted intervals (`X[:, gap, :] = 0`), inadvertently zeroing the Day-of-Year channels alongside NDVI. This artifact reversed apparent model rankings by depriving standard models of temporal reference while calendar-gated architectures retained implicit timing priors. These distorted comparisons were excluded, and subsequent evaluations rely solely on verified feature representations.
+3. **Milestone Denominator Truncation:** Agricultural cycles do not invariably exhibit complete transition profiles within a single observation year. In our test partition of 399 seasons, only 234 seasons contained a valid true EOS transition. Omitting unpredicted or absent transitions directly alters milestone error denominators, necessitating strict accounting of sample sizes when computing milestone RMSE.
+4. **Double-Logistic Boundary Clamping:** A classical parametric Double-Logistic baseline constrained fitted EOS midpoints to the normalized sequence boundary (1.0) and mapped them directly to day values. Furthermore, errors were computed as linear squared differences rather than utilizing a circular modular metric. This numerical artifact caused boundary-clamped estimates, leading to the deliberate exclusion of Double-Logistic from quantitative benchmark tables rather than post-hoc repair.
+
+---
+
+## 6 Limitations
+
+Several methodological constraints qualify the conclusions of this study:
+- **Asymmetric Baseline Tuning:** The full-season tabular baseline models (Random Forest and XGBoost) were evaluated using fixed, unoptimized configurations, whereas the causal-lag baselines underwent a 50-trial randomized search, and deep architectures utilized robust literature defaults. Furthermore, Random Forest utilized balanced class weighting while XGBoost did not, potentially exacerbating performance differences on the imbalanced four-class segmentation task. Consequently, the performance gap between the full-season tabular models and the deep sequential architectures may be artificially inflated due to this lack of tuning.
+- **Pseudo-Ground-Truth Targets:** The phenological stage labels are algorithmically generated from smoothed Sentinel-2 NDVI profiles using fixed amplitude thresholds. While standard in remote sensing benchmarks, these targets measure consistency with a derived labeling heuristic rather than validation against in-situ PhenoCam imagery or biophysical field measurements.
+- **Unavailable Cross-Region Transfer:** Evaluation across distinct climatic zones (`frh02` and `frh03`) could not be completed due to dataset host bandwidth constraints during retrieval. Consequently, geographic transferability to distinct agro-ecological regions remains unverified.
+- **Intra-Region Spatial CV Exclusion:** Preliminary spatial cross-validation based on French RPG parcel-ID prefixes was excluded from formal benchmark claims, as parcel prefix grouping lacks independent agronomic validation as an unbiased geographic spatial split.
+- **Double-Logistic Benchmark Exclusion:** As detailed in Section 5.1, the Double-Logistic implementation exhibited boundary clamping and non-circular error metrics, precluding its inclusion as an authoritative baseline without substantive architectural refactoring.
+
+---
+
+## 7 Conclusion
+
+This paper presents an audited benchmark and ablation study evaluating deep sequential models and calendar-aware attention mechanisms for Sentinel-2 NDVI crop phenology extraction. While deep sequential models achieve substantial improvements over local tabular baselines, seed-paired statistical tests across seven configurations establish that calendar conditioning mechanisms do not produce statistically significant improvements compared to a Standard Transformer. Complementary season-level bootstrap analysis is consistent with these findings, with most variants exhibiting a very small degradation in temporal segmentation fidelity. By openly documenting key methodological pitfalls and maintaining strict data provenance, this study provides an objective empirical reference for future remote sensing time-series investigations.
+
+---
+
+## Disclosure and Data Availability
+
+**Conflict of Interest:** The authors declare that they have no competing financial or personal interests that could have appeared to influence the work reported in this paper.  
+**Data and Code Availability:** Evaluation scripts, preprocessed data manifests, and benchmark logs are maintained within the project repository. The underlying BreizhCrops dataset is publicly available via its official distribution channels.
+
+---
+
+## References
+
+[1] Jönsson, P., Eklundh, L.: TIMESAT—a program for analyzing time-series of satellite sensor data. Computers & Geosciences 30(8), 833–845 (2004).
+
+[2] Zhang, X., Friedl, M.A., Schaaf, C.B., Strahler, A.H., Hodges, J.C., Gao, F., Reed, B.C., Huete, A.: Monitoring vegetation phenology using MODIS. Remote Sensing of Environment 84(3), 471–475 (2003).
+
+[3] Zeng, L., Wardlow, B.D., Xiang, D., Hu, S., Li, D.: A review of vegetation phenological metrics extraction using time-series, multispectral satellite data. Remote Sensing of Environment 237, 111511 (2020).
+
+[4] Pelletier, C., Webb, G.I., Petitjean, F.: Temporal Convolutional Neural Network for the Classification of Satellite Image Time Series. Remote Sensing 11(5), 523 (2019).
+
+[5] Sainte Fare Garnot, V., Landrieu, L., Giordano, S., Chehata, N.: Satellite image time series classification with pixel-set encoders and temporal self-attention. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), pp. 12322–12331 (2020).
+
+[6] Tarasiou, M., Chavez, E., Zafeiriou, S.: ViTs for SITS: Vision Transformers for Satellite Image Time Series. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), pp. 10418–10428 (2023).
+
+[7] Beck, P.S., Atzberger, C., Høgda, K.A., Johansen, B., Skidmore, A.K.: Improved monitoring of vegetation dynamics at very high latitudes: A new method using MODIS NDVI. Remote Sensing of Environment 100(3), 321–334 (2006).
+
+[8] Rußwurm, M., Pelletier, C., Zollner, M., Lefèvre, S., Körner, M.: BreizhCrops: A Time Series Dataset for Crop Type Mapping. International Archives of the Photogrammetry, Remote Sensing and Spatial Information Sciences XLIII-B2-2020, 1545–1551 (2020).
+
+[9] Boschetti, M., Stroppiana, D., Brivio, P.A., Bocchi, S.: Multi-year monitoring of rice crop phenology through time series analysis of MODIS images. International Journal of Remote Sensing 30(18), 4643–4662 (2009).
+
+[10] Breiman, L.: Random Forests. Machine Learning 45(1), 5–32 (2001).
+
+[11] Chen, T., Guestrin, C.: XGBoost: A scalable tree boosting system. In: Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining, pp. 785–794 (2016).
+
+[12] Schuster, M., Paliwal, K.K.: Bidirectional recurrent neural networks. IEEE Transactions on Signal Processing 45(11), 2673–2681 (1997).
+
+[13] Hochreiter, S., Schmidhuber, J.: Long short-term memory. Neural Computation 9(8), 1735–1780 (1997).
+
+[14] Savitzky, A., Golay, M.J.: Smoothing and differentiation of data by simplified least squares procedures. Analytical Chemistry 36(8), 1627–1639 (1964).
+
+[15] Jakubauskas, M.E., Legates, D.R., Kastens, J.H.: Harmonic analysis of time-series AVHRR NDVI data. Photogrammetric Engineering & Remote Sensing 67(4), 461–470 (2001).
+
+[16] Defourny, P., Bontemps, S., Bellemans, N., Cara, C., Dedieu, G., Guzzonato, E., Hagolle, O., Inglada, J., Nicola, L., Rabaute, T.: Near real-time agriculture monitoring at national scale at parcel resolution: Performance assessment of the Sen2-Agri automated system in various cropping systems around the world. Remote Sensing of Environment 221, 551–568 (2019).
