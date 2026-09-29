@@ -42,11 +42,17 @@ def _get_all_records() -> list[SeasonRecord]:
     sample per call if the RNG state weren't reset, corrupting the split)."""
     global _ALL_RECORDS_CACHE
     if _ALL_RECORDS_CACHE is None:
-        from .data.breizhcrops_loader import load_breizhcrops_records
-        # 1000/class (up from an initial 300/class smoke-test run) -- more data
-        # for a real, non-toy comparison; frh01 has 5k-44k parcels per annual
-        # crop class, plenty of headroom (see the 2026-09-13 research note).
-        _ALL_RECORDS_CACHE = load_breizhcrops_records(region="frh01", max_per_class=1000)
+        cache_path = Path(__file__).resolve().parent.parent / "data" / "frh01_cache.pkl"
+        if cache_path.exists():
+            import pickle
+            with open(cache_path, "rb") as f:
+                _ALL_RECORDS_CACHE = pickle.load(f)
+        else:
+            from .data.breizhcrops_loader import load_breizhcrops_records
+            # 1000/class (up from an initial 300/class smoke-test run) -- more data
+            # for a real, non-toy comparison; frh01 has 5k-44k parcels per annual
+            # crop class, plenty of headroom (see the 2026-09-13 research note).
+            _ALL_RECORDS_CACHE = load_breizhcrops_records(region="frh01", max_per_class=1000)
     return _ALL_RECORDS_CACHE
 
 
@@ -95,7 +101,7 @@ def _evaluate_macro_f1(model, loader, device: str) -> float:
     return segmentation_metrics(y_true, y_pred, mask)["macro_f1"]
 
 
-def train_dl_model(model_name: str, device: str = "cpu", max_epochs: int = 150, patience: int = 15, seed: int = 42):
+def train_dl_model(model_name: str, device: str = "cpu", max_epochs: int = 150, patience: int = 15, seed: int = 42, lr: float = 1e-3, weight_decay: float = 1e-5):
     # Found while re-running for the instructor's deeper-evaluation pass: this
     # function had NO seed for model init/dropout/shuffle (only the train/val/
     # test SPLIT was seeded, in load_records) -- two runs of the same model
@@ -121,20 +127,41 @@ def train_dl_model(model_name: str, device: str = "cpu", max_epochs: int = 150, 
     in_channels = train_ds.n_channels
     if model_name == "cnn1d":
         from .models.cnn1d import NDVICNN1D
-        model = NDVICNN1D(in_channels=in_channels).to(device)
+        model = NDVICNN1D(in_channels=in_channels, channels=(64, 64, 80)).to(device)
     elif model_name == "bilstm":
         from .models.bilstm import NDVIBiLSTM
-        model = NDVIBiLSTM(in_channels=in_channels).to(device)
+        model = NDVIBiLSTM(in_channels=in_channels, hidden_size=90, cell_type="lstm").to(device)
+    elif model_name == "gru":
+        from .models.bilstm import NDVIBiLSTM
+        model = NDVIBiLSTM(in_channels=in_channels, hidden_size=104, cell_type="gru").to(device)
+    elif model_name == "tcn":
+        from .models.tcn import NDVITCN
+        model = NDVITCN(in_channels=in_channels, num_channels=(64, 64, 80)).to(device)
     elif model_name == "transformer":
         from .models.transformer import NDVITransformer
-        model = NDVITransformer(in_channels=in_channels).to(device)
+        model = NDVITransformer(in_channels=in_channels, is_causal=False).to(device)
+    elif model_name == "transformer_causal":
+        from .models.transformer import NDVITransformer
+        model = NDVITransformer(in_channels=in_channels, is_causal=True).to(device)
     elif model_name == "cba_phenonet":
         from .models.cba_phenonet import CBAPhenoNet
         model = CBAPhenoNet(in_channels=in_channels).to(device)
+    elif model_name == "transformer_cyclical_doy":
+        from .models.ablation_models import TransformerCyclicalDOY
+        model = TransformerCyclicalDOY(in_channels=in_channels).to(device)
+    elif model_name == "transformer_calendar_gate":
+        from .models.ablation_models import TransformerCalendarGate
+        model = TransformerCalendarGate(in_channels=in_channels).to(device)
+    elif model_name == "cba_phenonet_residual":
+        from .models.ablation_models import CBAPhenoNetResidual
+        model = CBAPhenoNetResidual(in_channels=in_channels).to(device)
+    elif model_name == "cba_phenonet_disentangled":
+        from .models.ablation_models import CBAPhenoNetDisentangled
+        model = CBAPhenoNetDisentangled(in_channels=in_channels).to(device)
     else:
         raise ValueError(model_name)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=NDVISequenceDataset.PAD_LABEL)
 
     # Real early stopping on held-out val_loader (previously loaded but never
@@ -220,13 +247,13 @@ def train_ml_baseline(model_name: str):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", required=True, choices=["cnn1d", "bilstm", "transformer", "cba_phenonet", "rf", "xgboost"])
+    parser.add_argument("--model", required=True, choices=["cnn1d", "bilstm", "transformer", "cba_phenonet", "transformer_cyclical_doy", "transformer_calendar_gate", "cba_phenonet_residual", "cba_phenonet_disentangled", "rf", "xgboost"])
     parser.add_argument("--member", required=True, help="your name, for the shared results table")
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--seed", type=int, default=42, help="DL model init/dropout/shuffle seed -- run with 2-3 different seeds and compare mean+/-std before trusting a single run's model ranking (see docs/paper_outline.md future-work note on multi-seed reporting)")
     args = parser.parse_args()
 
-    if args.model in ("cnn1d", "bilstm", "transformer", "cba_phenonet"):
+    if args.model in ("cnn1d", "bilstm", "transformer", "cba_phenonet", "transformer_cyclical_doy", "transformer_calendar_gate", "cba_phenonet_residual", "cba_phenonet_disentangled"):
         y_true, y_pred, doy, ndvi, mask, train_s, infer_ms, season_ids = train_dl_model(args.model, args.device, seed=args.seed)
     else:
         y_true, y_pred, doy, ndvi, mask, train_s, infer_ms, season_ids = train_ml_baseline(args.model)

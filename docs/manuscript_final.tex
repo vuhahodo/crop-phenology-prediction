@@ -95,9 +95,10 @@ Whenever a predicted or true milestone transition is absent in a given season, t
 \centering
 \caption{EOS prediction coverage averaged across 10 seeds on the 234 eligible test seasons.}
 \label{tab:eos_coverage}
+\resizebox{0.85\textwidth}{!}{
 \begin{tabular}{@{}lccc@{}}
 \toprule
-\textbf{Model} & \textbf{True EOS} & \textbf{Mean Paired Predictions (across 10 seeds)} & \textbf{Mean Coverage (\%)} \\ \midrule
+\textbf{Model} & \textbf{Eligible EOS} & \textbf{Mean Paired Preds} & \textbf{Mean Coverage (\%)} \\ \midrule
 Standard Transformer & 234 & 223.5 & 95.5\% \\
 Cyclical DOY & 234 & 221.5 & 94.7\% \\
 Calendar Gate & 234 & 222.4 & 95.0\% \\
@@ -106,6 +107,7 @@ CBA-PhenoNet & 234 & 225.2 & 96.2\% \\
 CBA-PhenoNet + Residual & 234 & 224.2 & 95.8\% \\
 CBA-PhenoNet + Disentangled & 234 & 223.3 & 95.4\% \\ \bottomrule
 \end{tabular}
+}
 \end{table}
 
 \section{Experimental Results}

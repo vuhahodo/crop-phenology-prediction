@@ -50,8 +50,9 @@ class NDVITransformer(nn.Module):
 
     def __init__(self, in_channels: int, num_classes: int = 4, d_model: int = 64,
                  nhead: int = 4, num_layers: int = 2, dim_feedforward: int = 128,
-                 dropout: float = 0.1, max_len: int = 512):
+                 dropout: float = 0.1, max_len: int = 512, is_causal: bool = False):
         super().__init__()
+        self.is_causal = is_causal
         self.input_proj = nn.Linear(in_channels, d_model)
         self.pos_enc = SinusoidalPositionalEncoding(d_model, max_len=max_len)
         encoder_layer = nn.TransformerEncoderLayer(
@@ -63,5 +64,11 @@ class NDVITransformer(nn.Module):
 
     def forward(self, x: torch.Tensor, padding_mask: torch.Tensor | None = None) -> torch.Tensor:
         h = self.pos_enc(self.input_proj(x))
-        h = self.encoder(h, src_key_padding_mask=padding_mask)
+        if self.is_causal:
+            seq_len = x.size(1)
+            # Upper triangular mask (future tokens masked out with -inf, current/past with 0.0)
+            mask = nn.Transformer.generate_square_subsequent_mask(seq_len, device=x.device)
+            h = self.encoder(h, mask=mask, src_key_padding_mask=padding_mask, is_causal=True)
+        else:
+            h = self.encoder(h, src_key_padding_mask=padding_mask)
         return self.classifier(h)
