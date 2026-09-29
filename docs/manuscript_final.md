@@ -45,7 +45,7 @@ Vegetation phenology extraction has traditionally relied on semi-empirical curve
 
 With the increasing availability of dense satellite constellations like Sentinel-2, deep learning methods have emerged as powerful alternatives for Satellite Image Time Series (SITS) processing [8,15]. Pelletier et al. demonstrated the efficacy of temporal convolutional neural networks (TCNN) for parcel-level classification [4], while bidirectional recurrent architectures (Bi-LSTM) effectively model long-range temporal dependencies in vegetation profiles [12]. More recently, self-attention architectures and Vision Transformers adapted for SITS—such as Pixel-Set Encoders and SITS-ViT—have set state-of-the-art benchmarks for land-cover mapping by capturing complex inter-timestep interactions [5,6]. 
 
-Building upon these foundations, recent studies have explored incorporating external domain priors, such as Day-of-Year (DOY) embeddings or calendar gating [17, 18, 5], to resolve temporal ambiguities. The present study establishes an open benchmark comparing these broad model families for dense phenological stage segmentation, while conducting a systematic ablation of calendar-aware attention components. Crucially, we treat calendar mechanisms as an empirical ablation rather than asserting a novel, validated inductive mechanism.
+Building upon these foundations, recent studies have explored incorporating external domain priors, such as Day-of-Year (DOY) embeddings or calendar gating [17, 18], to resolve temporal ambiguities. The present study establishes an open benchmark comparing these broad model families for dense phenological stage segmentation, while conducting a systematic ablation of calendar-aware attention components. Crucially, we treat calendar mechanisms as an empirical ablation rather than asserting a novel, validated inductive mechanism.
 
 ---
 
@@ -79,11 +79,11 @@ Under evaluation Protocol A, continuous sequence predictions are deterministical
 - **Peak of Season (POS):** Identified as the date of maximum NDVI observed within the predicted vegetative or reproductive intervals (Classes 1 and 2).
 - **End of Season (EOS):** Decoded at the transition from Class 3 (Senescence) back to Class 0 (Fallow).
 
-Whenever a predicted or true milestone transition is absent in a given season, that season is excluded from the error denominator for that specific milestone. To ensure methodological transparency regarding denominator truncation: SOS and POS achieve a 100% detection rate (valid in all 399 test seasons). A valid true EOS milestone transition, however, is present in exactly 234 of the 399 test seasons (58.6% detection rate). Across all evaluated deep architectures, the models successfully predicted a paired EOS transition in 94.7% to 96.2% of these 234 eligible seasons (Table 0), confirming that the EOS RMSE denominator remains highly stable across models without significant prediction-dropout bias. Evaluation of EOS RMSE is strictly conditioned on this subset.
+Whenever a predicted or true milestone transition is absent in a given season, that season is excluded from the error denominator for that specific milestone. To ensure methodological transparency regarding denominator truncation: SOS and POS achieve a 100% detection rate (valid in all 399 test seasons). A valid true EOS milestone transition, however, is present in exactly 234 of the 399 test seasons (58.6% detection rate). Across all evaluated deep architectures, the models successfully predicted a paired EOS transition in 94.7% to 96.2% of these 234 eligible seasons (Table 0), indicating that the EOS RMSE denominator remains highly stable across models, with only minor variation in prediction coverage. Evaluation of EOS RMSE is strictly conditioned on this subset.
 
-**Table 0.** EOS Prediction Coverage (per-model paired prediction rate on the 234 eligible test seasons).
+**Table 0.** EOS prediction coverage averaged across 10 seeds on the 234 eligible test seasons.
 
-| Model | True EOS | Paired Predictions | Coverage |
+| Model | True EOS | Mean Paired Predictions (across 10 seeds) | Mean Coverage (%) |
 | :--- | :---: | :---: | :---: |
 | **Standard Transformer** | 234 | 223.5 | 95.5% |
 | **Cyclical DOY** | 234 | 221.5 | 94.7% |
@@ -125,7 +125,7 @@ $^\dagger$*Footnote on XGBoost full-season determinism:* The benchmark seed-leve
 
 *Note on models:* The causal-lag Random Forest and XGBoost entries lack uncertainty quantification. Direct statistical comparison between causal (Setting A) and bidirectional (Setting B) models is intentionally avoided, as performance gaps reflect both information budget and architectural capacity.
 
-As shown in the benchmark tables, bidirectional sequence modeling provides substantial advantages over local causal-lag formulations, raising Macro-F1 from ~0.40–0.42 to >0.83–0.90. Full-season summary statistics notably improve tabular performance (0.7154–0.7477), narrowing but not closing the gap to deep attention-based architectures, which achieve the strongest overall segmentation fidelity (0.8992–0.9060).
+As shown in the benchmark tables, models operating under the retrospective full-season setting achieve substantially higher Macro-F1 than local causal-lag models, although this gap reflects differences in both information availability and architectural capacity. Full-season summary statistics notably improve tabular performance (0.7154–0.7477), narrowing but not closing the gap to deep attention-based architectures, which achieve the strongest overall segmentation fidelity (0.8992–0.9060).
 
 ---
 
