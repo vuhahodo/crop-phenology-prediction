@@ -52,7 +52,7 @@ Building upon these foundations, recent studies have explored incorporating exte
 ## 3 Data and Evaluation Protocol
 
 ### 3.1 Dataset Partitioning and Target Derivation
-All experiments are conducted using the BreizhCrops dataset, focusing on the `frh01` (Ille-et-Vilaine, France) 2017 partition and evaluating on 399 held-out test parcel seasons. Each agricultural season is regularized onto 73 five-day temporal steps, spanning the full annual vegetative cycle.
+We utilize the public BreizhCrops benchmark [8], comprising bottom-of-atmosphere Sentinel-2 time series acquired over Brittany, France (`frh01` region, 2017). From an initial candidate cohort of 3,328 annual crop seasons across four crop categories (barley, wheat, rapeseed, and corn), quality filtering (removing flat NDVI trajectories $\Delta\text{NDVI} < 0.15$ and edge-truncated peaks) retains 2,655 valid annual growth cycles. Each sample spans $T=73$ interpolated 5-day composite steps. The dataset is partitioned into training (1857 seasons, 70%), validation (399 seasons, 15%), and test sets (399 seasons, 15%) strictly at the field parcel level to prevent spatial leakage.
 
 The target labels represent four distinct phenological stages:
 - **Class 0:** Fallow / Bare Soil
@@ -60,15 +60,26 @@ The target labels represent four distinct phenological stages:
 - **Class 2:** Reproductive / Peak Canopy
 - **Class 3:** Senescence / Maturation
 
-These sequence labels are generated from smoothed NDVI series using a 20% seasonal amplitude threshold. As emphasized in Section 1, because these labels are derived from the input signal itself, they constitute algorithmic pseudo-ground-truth rather than in-situ agronomic observations.
+These sequence labels are generated from smoothed NDVI series using a 20% seasonal amplitude threshold. As emphasized in Section 1, because these labels are derived from the input signal itself, they constitute algorithmic pseudo-ground-truth rather than in-situ agronomic observations. Furthermore, point-wise stage assignment induces severe class imbalance: Fallow dominates 65.00% of all timesteps, whereas Vegetative (12.66%), Senescence (13.94%), and Reproductive (8.40%) are underrepresented.
 
-### 3.2 Protocol A Decoding
+### 3.2 Proposed CBA-PhenoNet Architecture
+CBA-PhenoNet comprises three primary components: a cyclical date-aware embedding, stacked gated self-attention layers, and a linear segmentation head.
+
+**Cyclical Day-of-Year Positional Encoding:** Unlike standard Transformers that index sequences ordinally ($0, \dots, T-1$), CBA-PhenoNet encodes actual acquisition timing using circular harmonics:
+$$e_{\text{doy}}(t) = \left[ \sin\left(\frac{2\pi \cdot \text{DOY}_t}{365.0}\right), \; \cos\left(\frac{2\pi \cdot \text{DOY}_t}{365.0}\right) \right] \in \mathbb{R}^2$$
+
+**Calendar Gating Prior:** To provide a calendar-conditioned prior over developmental windows, we introduce a non-linear temporal gating module $g(t)$:
+$$g(t) = \sigma\left( W_2 \cdot \text{ReLU}\left(W_1 \cdot e_{\text{doy}}(t) + b_1\right) + b_2 \right) \in (0, 1)$$
+$$h_{\text{gated}}(t) = h_{\text{encoder}}(t) \odot g(t)$$
+where $h_{\text{encoder}}(t)$ denotes the output of the multi-head self-attention block. Because the regularized 5-day time grid is shared across all samples, $g(t)$ acts as a learned global calendar-dependent modulation over local attention representations. The baseline Transformer comprises 67,460 parameters. CBA-PhenoNet totals 67,782 parameters, introducing a mere 322 parameters (+0.48%) for the DOY positional projection and the calendar gating modules.
+
+### 3.3 Protocol A Decoding
 Under evaluation Protocol A, continuous sequence predictions are deterministically decoded into discrete calendar milestone days:
 - **Start of Season (SOS):** Decoded at the first temporal transition from Class 0 (Fallow) to Class 1 (Vegetative).
 - **Peak of Season (POS):** Identified as the date of maximum NDVI observed within the predicted vegetative or reproductive intervals (Classes 1 and 2).
 - **End of Season (EOS):** Decoded at the transition from Class 3 (Senescence) back to Class 0 (Fallow).
 
-Whenever a predicted or true milestone transition is absent in a given season, that season is excluded from the error denominator for that specific milestone. Notably, while SOS and POS are identifiable in all 399 test seasons, a valid true EOS milestone transition is present in exactly 234 of the 399 test seasons.
+Whenever a predicted or true milestone transition is absent in a given season, that season is excluded from the error denominator for that specific milestone. To ensure methodological transparency regarding denominator truncation: SOS and POS achieve a 100% detection rate (valid in all 399 test seasons). A valid true EOS milestone transition, however, is present in exactly 234 of the 399 test seasons (58.6% detection rate). Evaluation of EOS RMSE is strictly conditioned on this 234-season subset.
 
 ---
 
@@ -78,35 +89,38 @@ Whenever a predicted or true milestone transition is absent in a given season, t
 To ensure equitable comparisons while managing computational budgets, model configurations varied between baseline and deep architectures. For causal-lag machine learning baselines, hyperparameters were determined via a 50-trial randomized search over a predefined validation space. Conversely, full-season tabular baselines utilized fixed, unoptimized configurations (e.g., 300 estimators, maximum depth of 6). Across all tabular experiments, the Random Forest classifier explicitly utilized class weighting (`class_weight="balanced"`) to mitigate class imbalance, whereas the XGBoost implementation did not include explicit class weighting. For the deep sequential (1D-CNN, Bi-LSTM) and self-attention architectures, hyperparameters (including learning rate, batch size, dropout, and hidden dimensionality) were fixed to standard literature defaults or starting values to evaluate intrinsic architectural inductive biases rather than exhaustive hyperparameter tuning. All deep models were optimized using Adam with a learning rate of 0.001 and batch size of 32, training for up to 150 epochs with early stopping based on validation Macro-F1.
 
 ### 4.2 Main Architecture Benchmark
-Table 1 presents the overall performance comparison across model families evaluated on test partition Macro-F1. For causal-lag baselines, single-comparison estimates from prior phases are retained; for all full-season tabular and deep sequential architectures, results reflect the mean and sample standard deviation across ten independent seeds under Protocol A. The full-season tabular models incorporate both the complete 73-step NDVI trajectory and 12 seasonal summary features.
+To address concerns regarding information-budget confounding, we explicitly bifurcate our benchmarking into two distinct evaluation regimes. Setting A (Table 1) evaluates models strictly limited to causal (historical) contexts, representing online processing scenarios. Setting B (Table 2) evaluates retrospective full-season models with bidirectional access to the entire trajectory. For causal-lag baselines, single-comparison estimates from prior phases are retained; for all Setting B tabular and deep architectures, results reflect the mean and sample standard deviation across ten independent seeds.
 
-**Table 1.** Main benchmark comparison across tabular and deep sequential architectures on the held-out test partition (399 seasons). Models are categorized into Setting A (Causal/Online, restricted to historical context) and Setting B (Retrospective/Full-Season, utilizing bidirectional context). Performance is reported as Macro-F1 (ten-seed mean ± sample standard deviation, except where single or deterministic runs apply).
+**Table 1.** Setting A Benchmark: Causal / Online Models (Local Context) on 399 test seasons.
 
 | Model Family | Model Architecture | Macro-F1 | Empirical Evidence / Source |
 |:---|:---|:---:|:---|
-| **Setting A: Causal / Online (Local Context)** | | | |
-| Causal Tabular | Random Forest, causal-lag [10] | 0.4205 | Single comparison (`results/comparison_table.csv`) |
-| | XGBoost, causal-lag [11] | 0.4029 | Single comparison (`results/comparison_table.csv`) |
-| Causal Deep | 1D-CNN (Causal) [4] | 0.6400 ± 0.0132 | 10 seeds (`results/tables/b0d_fullseason_protocol_a_per_seed.csv`) |
-| **Setting B: Retrospective / Full-Season (Bidirectional Context)** | | | |
-| Full-Season Tabular | Random Forest, full-season [10] | 0.7154 ± 0.0023 | 10 seeds (`results/tables/b0d_fullseason_protocol_a_per_seed.csv`) |
+| **Causal Tabular** | Random Forest, causal-lag [10] | 0.4205 | Single comparison |
+| | XGBoost, causal-lag [11] | 0.4029 | Single comparison |
+| **Causal Deep** | 1D-CNN (Causal) [4] | 0.6400 ± 0.0132 | 10 seeds |
+
+**Table 2.** Setting B Benchmark: Retrospective / Full-Season Models (Bidirectional Context) on 399 test seasons.
+
+| Model Family | Model Architecture | Macro-F1 | Empirical Evidence / Source |
+|:---|:---|:---:|:---|
+| **Full-Season Tabular** | Random Forest, full-season [10] | 0.7154 ± 0.0023 | 10 seeds |
 | | XGBoost, full-season [11]$^\dagger$ | 0.7477 | Deterministic across seeds |
-| Deep Sequential | Bi-LSTM [12] | 0.8357 ± 0.0082 | 10 seeds (`results/tables/b0d_fullseason_protocol_a_per_seed.csv`) |
-| | Standard Transformer | **0.9060 ± 0.0089** | 10 seeds (`results/tables/b0d_ablation_metrics_per_seed.csv`) |
-| | CBA-PhenoNet | 0.8992 ± 0.0187 | 10 seeds (`results/tables/b0d_ablation_metrics_per_seed.csv`) |
+| **Deep Sequential** | Bi-LSTM [12] | 0.8357 ± 0.0082 | 10 seeds |
+| | Standard Transformer | **0.9060 ± 0.0089** | 10 seeds |
+| | CBA-PhenoNet | 0.8992 ± 0.0187 | 10 seeds |
 
 $^\dagger$*Footnote on XGBoost full-season determinism:* The benchmark seed-level results report exactly 0.7477 for all ten XGBoost seeds, in contrast to an earlier preliminary phase report noting 0.6052. Source code inspection of `src/b0d_fullseason_run.py:86-87` confirms that `random_state=seed` was explicitly provided. However, because row and column subsampling parameters are inactive (`subsample=1.0`, `colsample_bytree=1.0`), gradient boosted tree construction via exact greedy splitting is fully deterministic. All ten seeds produced identical predictions (zero mismatches across 29,127 test timesteps) and identical feature importances (maximum absolute difference 0.0). This value is explicitly reported as a single deterministic result and is not interchangeable with 0.6052.
 
-*Note on causal-lag baselines:* The causal-lag Random Forest and XGBoost entries are single-run point estimates from a prior comparison phase and therefore lack uncertainty quantification. Their inclusion provides directional context for the magnitude of the causal-to-bidirectional performance gap, but direct statistical comparison with ten-seed deep sequential estimates is not appropriate.
+*Note on models:* The causal-lag Random Forest and XGBoost entries lack uncertainty quantification. Direct statistical comparison between causal (Setting A) and bidirectional (Setting B) models is intentionally avoided, as performance gaps reflect both information budget and architectural capacity.
 
-As shown in Table 1, bidirectional sequence modeling provides substantial advantages over local causal-lag formulations, raising Macro-F1 from ~0.40–0.42 to >0.83–0.90. Full-season summary statistics notably improve tabular performance (0.7154–0.7477), narrowing but not closing the gap to deep attention-based architectures, which achieve the strongest overall segmentation fidelity (0.8992–0.9060).
+As shown in the benchmark tables, bidirectional sequence modeling provides substantial advantages over local causal-lag formulations, raising Macro-F1 from ~0.40–0.42 to >0.83–0.90. Full-season summary statistics notably improve tabular performance (0.7154–0.7477), narrowing but not closing the gap to deep attention-based architectures, which achieve the strongest overall segmentation fidelity (0.8992–0.9060).
 
 ---
 
 ### 4.3 Calendar-Aware Ablation Study
-To investigate RQ2, we systematically ablate calendar-conditioning mechanisms across seven distinct configurations over ten seeds. Table 2 summarizes the resulting stage segmentation Macro-F1 and decoded milestone estimation errors (RMSE in days) for SOS, POS, and EOS.
+To investigate RQ2, we systematically ablate calendar-conditioning mechanisms across seven distinct configurations over ten seeds. Table 3 summarizes the resulting stage segmentation Macro-F1 and decoded milestone estimation errors (RMSE in days) for SOS, POS, and EOS.
 
-**Table 2.** Ten-seed ablation metrics (mean ± sample standard deviation) across calendar-aware variants on the 399-season test partition.
+**Table 3.** Ten-seed ablation metrics (mean ± sample standard deviation) across calendar-aware variants on the 399-season test partition.
 
 | Configuration | Macro-F1 | SOS RMSE (days) | POS RMSE (days) | EOS RMSE (days) |
 |:---|:---:|:---:|:---:|:---:|
@@ -118,9 +132,9 @@ To investigate RQ2, we systematically ablate calendar-conditioning mechanisms ac
 | CBA-PhenoNet + Residual | 0.8962 ± 0.0133 | **31.20 ± 6.77** | **15.98 ± 8.38** | 28.12 ± 4.14 |
 | CBA-PhenoNet + Disentangled | 0.8972 ± 0.0199 | 33.23 ± 3.96 | 23.24 ± 4.81 | 28.50 ± 5.48 |
 
-To evaluate whether the observed variations in Table 2 represent statistically meaningful improvements, each calendar-aware variant was evaluated against the Standard Transformer using seed-paired two-sided $t$-tests. Multiple-testing correction was conducted globally across all 60 comparisons spanning ten endpoint families using the Holm-Bonferroni step-down procedure. Furthermore, we computed per-season Macro-F1 differences between the Standard Transformer and each variant across all 399 test seasons, using non-parametric bootstrapping (2000 resamples) to estimate 95% confidence intervals and seed-level Cohen's $d$ effect sizes. The results for the primary endpoints are detailed in Table 3.
+To evaluate whether the observed variations in Table 3 represent statistically meaningful improvements, each calendar-aware variant was evaluated against the Standard Transformer using seed-paired two-sided $t$-tests. Multiple-testing correction was conducted globally across all 60 comparisons spanning ten endpoint families using the Holm-Bonferroni step-down procedure. Furthermore, we computed per-season Macro-F1 differences between the Standard Transformer and each variant across all 399 test seasons, using non-parametric bootstrapping (2000 resamples) to estimate 95% confidence intervals and seed-level Cohen's $d$ effect sizes. The results for the primary endpoints are detailed in Table 4.
 
-**Table 3.** Seed-paired hypothesis testing against the Standard Transformer across four endpoint families ($N=10$ paired seeds). Reported values show unadjusted raw $p$-values ($p_{\text{raw}}$) and family-wise Holm-adjusted $p$-values ($p_{\text{adj}}$).
+**Table 4.** Seed-paired hypothesis testing against the Standard Transformer across four endpoint families ($N=10$ paired seeds). Reported values show unadjusted raw $p$-values ($p_{\text{raw}}$) and family-wise Holm-adjusted $p$-values ($p_{\text{adj}}$).
 
 | Configuration vs. Standard Transformer | Macro-F1 ($p_{\text{raw}} \,/\, p_{\text{adj}}$) | SOS RMSE ($p_{\text{raw}} \,/\, p_{\text{adj}}$) | POS RMSE ($p_{\text{raw}} \,/\, p_{\text{adj}}$) | EOS RMSE ($p_{\text{raw}} \,/\, p_{\text{adj}}$) |
 |:---|:---:|:---:|:---:|:---:|
@@ -131,9 +145,9 @@ To evaluate whether the observed variations in Table 2 represent statistically m
 | **CBA-PhenoNet + Residual** | 0.1291 / 0.6453 | 0.0637 / 0.3822 | 0.0132 / 0.0793 | 0.4438 / 1.0000 |
 | **CBA-PhenoNet + Disentangled** | 0.2532 / 0.9934 | 0.1228 / 0.5402 | 0.3605 / 1.0000 | 0.8126 / 1.0000 |
 
-Across all 60 formal comparisons spanning the ten evaluated endpoint families, **zero comparisons demonstrate statistically significant differences** following global Holm adjustment at the $\alpha = 0.05$ threshold. The 4 primary families presented in Table 3 were selected post-hoc for concise reporting, while the remaining 6 auxiliary count-based families were treated as exploratory. The minimum observed globally-adjusted $p$-value across the entire 60-comparison experimental suite is $p_{\text{adj}} = 0.0633$ (observed in the Macro-F1 metric for Cyclical DOY, where $p_{\text{raw}} = 0.0106$). Because this minimum significant result fails to reach significance under global adjustment, the empirical evidence does not support the hypothesis that explicit calendar conditioning provides measurable accuracy gains in dense phenology segmentation under clean observational conditions. 
+Across all 60 formal comparisons spanning the ten evaluated endpoint families, **zero comparisons demonstrate statistically significant differences** following global Holm adjustment at the $\alpha = 0.05$ threshold. The 4 primary families presented in Table 4 were selected for concise reporting, while the remaining 6 auxiliary count-based families were treated as exploratory. The minimum observed globally-adjusted $p$-value across the entire 60-comparison experimental suite is $p_{\text{adj}} = 0.0633$ (observed in the Macro-F1 metric for Cyclical DOY, where $p_{\text{raw}} = 0.0106$). Because this minimum significant result fails to reach significance under global adjustment, the empirical evidence does not support the hypothesis that explicit calendar conditioning provides measurable accuracy gains in dense phenology segmentation under clean observational conditions. 
 
-While the seed-paired statistical tests capture variance across training trajectories (e.g., initialization and SGD noise), we additionally evaluated test-sample variability via non-parametric bootstrapping (2000 resamples of the 399 test seasons). For each bootstrap iteration, we resampled seasons with replacement, computed global Macro-F1 on the resampled set for each seed, averaged across seeds, and recorded the difference between each variant and the Standard Transformer. This procedure uses the same global Macro-F1 metric as Table 2, ensuring direct comparability. The resulting unadjusted 95% CIs indicate a lack of improvement: Cyclical DOY ($\Delta$F1 = -0.028, 95% CI [-0.034, -0.022]), Calendar Gate ($\Delta$F1 = -0.005, 95% CI [-0.009, -0.001]), Scalar Gate ($\Delta$F1 = -0.005, 95% CI [-0.008, -0.001]), CBA-PhenoNet ($\Delta$F1 = -0.007, 95% CI [-0.0132, +0.0002]), CBA-PhenoNet+Residual ($\Delta$F1 = -0.010, 95% CI [-0.0159, -0.0032]), and CBA-PhenoNet+Disentangled ($\Delta$F1 = -0.009, 95% CI [-0.0145, -0.0027]). Five of six CIs fall entirely below zero, while CBA-PhenoNet marginally includes zero. These bootstrap intervals, which measure test-sample variability but do not account for training-trajectory variance, complement the seed-paired $t$-tests (which do capture training variance but lack power at $N=10$). Together, both analyses are consistent: no calendar-aware variant improves upon the Standard Transformer, while several exhibit a very small degradation in the negative direction ($|\Delta\text{F1}| \leq 0.028$). Equivalence testing was not performed.
+While the seed-paired statistical tests capture variance across training trajectories (e.g., initialization and SGD noise), we additionally evaluated test-sample variability via non-parametric bootstrapping (2000 resamples of the 399 test seasons). For each bootstrap iteration, we resampled seasons with replacement, computed global Macro-F1 on the resampled set for each seed, averaged across seeds, and recorded the difference between each variant and the Standard Transformer. This procedure uses the same global Macro-F1 metric as Table 3, ensuring direct comparability. The resulting unadjusted 95% CIs indicate a lack of improvement: Cyclical DOY ($\Delta$F1 = -0.028, 95% CI [-0.034, -0.022]), Calendar Gate ($\Delta$F1 = -0.005, 95% CI [-0.009, -0.001]), Scalar Gate ($\Delta$F1 = -0.005, 95% CI [-0.008, -0.001]), CBA-PhenoNet ($\Delta$F1 = -0.007, 95% CI [-0.0132, +0.0002]), CBA-PhenoNet+Residual ($\Delta$F1 = -0.010, 95% CI [-0.0159, -0.0032]), and CBA-PhenoNet+Disentangled ($\Delta$F1 = -0.009, 95% CI [-0.0145, -0.0027]). Five of six CIs fall entirely below zero, while CBA-PhenoNet marginally includes zero. These bootstrap intervals, which measure test-sample variability but do not account for training-trajectory variance, complement the seed-paired $t$-tests (which do capture training variance but lack power at $N=10$). Together, both analyses are consistent: no calendar-aware variant improves upon the Standard Transformer, while several exhibit a very small degradation in the negative direction ($|\Delta\text{F1}| \leq 0.028$). Equivalence testing was not performed.
 
 ### 4.4 Exploratory Data Analysis and Error Diagnostics
 To contextualize the benchmark performance and respond to the need for robust multidimensional evaluation, we expand beyond Macro-F1 and RMSE by incorporating Exploratory Data Analysis (EDA) and extended milestone metrics (MAE, MedAE, MAPE, $R^2$, and Accuracy). 
@@ -141,10 +155,12 @@ To contextualize the benchmark performance and respond to the need for robust mu
 **Exploratory Data Analysis (EDA):**
 Analysis of the ground-truth milestone distributions (Figure 2, right) reveals distinct temporal patterns. The Peak of Season (POS) is highly concentrated around the middle of the calendar year, reflecting a standard single-harvest agricultural cycle. Conversely, the Start of Season (SOS) and End of Season (EOS) exhibit wider variance, with long tails indicating heterogeneous planting and harvesting schedules across different crop types in the BreizhCrops dataset. This variance explains why POS prediction consistently yields the lowest errors across all models.
 
-**Extended Milestone Metrics:**
-Table 4 presents a comprehensive metric suite for the CBA-PhenoNet model. Because the input sequence is regularized to 5-day intervals (73 timesteps), milestone predictions are inherently discretized. Consequently, tolerances such as Accuracy $\pm 1$ day or $\pm 3$ days are mathematically equivalent to exact-match accuracy at the 5-day resolution. POS achieves exceptional prediction fidelity (MAE $1.9$ days, $R^2$ $0.974$, exact-match Accuracy $98.4\%$). SOS and EOS show higher median absolute errors (MedAE $5.0$ and $0.0$ respectively) and lower $R^2$ ($0.870$ and $0.912$), reflecting the ambiguity of onset and senescence phases.
+**Extended Milestone Metrics and Naive POS Baseline:**
+Table 5 presents a comprehensive metric suite for the CBA-PhenoNet model. Because the input sequence is regularized to 5-day intervals (73 timesteps), milestone predictions are inherently discretized. Consequently, tolerances such as Accuracy $\pm 1$ day or $\pm 3$ days are mathematically equivalent to exact-match accuracy at the 5-day resolution. POS achieves exceptional prediction fidelity (MAE $1.9$ days, $R^2$ $0.974$, exact-match Accuracy $98.4\%$). SOS and EOS show higher median absolute errors (MedAE $5.0$ and $0.0$ respectively) and lower $R^2$ ($0.870$ and $0.912$), reflecting the ambiguity of onset and senescence phases.
 
-**Table 4.** Extended evaluation metrics for milestone decoding (CBA-PhenoNet, pooled across 10 seeds). Acc$\pm3$ is equivalent to exact-match accuracy due to 5-day temporal discretization. Note: RMSE values here are calculated globally across concatenated predictions, distinguishing them from Table 2 which reports the mean of per-seed RMSEs.
+Crucially, the decoding heuristic for POS merely selects the maximum NDVI timestamp within the predicted active classes. To quantify how much of the POS accuracy is attributable to the sequence model versus the deterministic heuristic, we evaluated a *Naive POS baseline* ($POS_{naive} = \arg\max_t NDVI_t$) across the entire test set. The naive baseline achieves a perfect MAE of 0.00 days (100% exact-match accuracy). This exploratory finding confirms that detecting the absolute POS requires no temporal sequence modeling on cleanly smoothed trajectories; the neural network's contribution is strictly limited to identifying the broader vegetative and senescence intervals.
+
+**Table 5.** Extended evaluation metrics for milestone decoding (CBA-PhenoNet, pooled across 10 seeds). Acc$\pm3$ is equivalent to exact-match accuracy due to 5-day temporal discretization. Note: RMSE values here are calculated globally across concatenated predictions, distinguishing them from Table 3 which reports the mean of per-seed RMSEs.
 
 | Milestone | MAE (days) | MedAE (days) | MAPE (%) | $R^2$ | Acc$\pm3$ (%) | RMSE (days) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
