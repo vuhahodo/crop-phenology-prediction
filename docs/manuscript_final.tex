@@ -4,6 +4,7 @@
 \usepackage[hidelinks]{hyperref}
 \usepackage{amsmath}
 \usepackage{microtype}
+\usepackage{placeins}
 \emergencystretch=1.5em
 
 \begin{document}
@@ -65,7 +66,14 @@ The target labels represent four distinct phenological stages:
 \subsection{BreizhCrops Dataset and Preprocessing}
 We utilize the public BreizhCrops benchmark \cite{breizhcrops}, comprising bottom-of-\allowbreak atmosphere Sentinel-2 time series acquired over Brittany, France (\texttt{frh01} region, 2017). From an initial candidate cohort of 3,328 annual crop seasons across four crop categories (barley, wheat, rapeseed, and corn), quality filtering (removing flat NDVI trajectories $\Delta\text{NDVI} < 0.15$ and edge-truncated peaks) retains 2,655 valid annual growth cycles. Each sample spans $T=73$ interpolated 5-day composite steps. The dataset is partitioned into training (1857 seasons, 70\%), validation (399 seasons, 15\%), and test sets (399 seasons, 15\%) strictly at the field parcel level to prevent spatial leakage.
 
-These sequence labels are generated from smoothed NDVI series using a 20\% seasonal amplitude threshold. As emphasized in Section 1, because these labels are derived from the input signal itself, they constitute algorithmic pseudo-ground-truth rather than in-situ agronomic observations. Furthermore, point-wise stage assignment induces severe class imbalance: Fallow dominates 65.00\% of all timesteps, whereas Vegetative (12.66\%), Senescence (13.94\%), and Reproductive (8.40\%) are underrepresented.
+These sequence labels are generated from smoothed NDVI series using a 20\% seasonal amplitude threshold. As emphasized in Section 1, because these labels are derived from the input signal itself, they constitute algorithmic pseudo-ground-truth rather than in-situ agronomic observations. Furthermore, point-wise stage assignment induces severe class imbalance: Fallow dominates 65.00\% of all timesteps, whereas Vegetative (12.66\%), Senescence (13.94\%), and Reproductive (8.40\%) are underrepresented (Fig. \ref{fig:eda_distribution}).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/eda_distribution.png}
+\caption{Exploratory data analysis of the filtered BreizhCrops subset: (a) distribution of seasonal NDVI amplitude after quality filtering; (b) class imbalance across the four pseudo-ground-truth phenological stages.}
+\label{fig:eda_distribution}
+\end{figure}
 
 \subsection{Proposed CBA-PhenoNet Architecture}
 CBA-PhenoNet comprises three primary components: a cyclical date-aware embedding, stacked gated self-attention layers, and a linear segmentation head.
@@ -82,7 +90,14 @@ g(t) = \sigma\left( W_2 \cdot \text{ReLU}\left(W_1 \cdot e_{\text{doy}}(t) + b_1
 \begin{equation}
 h_{\text{gated}}(t) = h_{\text{encoder}}(t) \odot g(t)
 \end{equation}
-where $h_{\text{encoder}}(t)$ denotes the output of the multi-head self-attention block. Because the regularized 5-day time grid is shared across all samples, $g(t)$ acts as a learned global calendar-dependent modulation over local attention representations. The baseline Transformer comprises 67,460 parameters. CBA-PhenoNet totals 67,782 parameters, introducing a mere 322 parameters (+0.48\%) for the DOY positional projection and the calendar gating modules.
+where $h_{\text{encoder}}(t)$ denotes the output of the multi-head self-attention block. Because the regularized 5-day time grid is shared across all samples, $g(t)$ acts as a learned global calendar-dependent modulation over local attention representations. The baseline Transformer comprises 67,460 parameters. CBA-PhenoNet totals 67,782 parameters, introducing a mere 322 parameters (+0.48\%) for the DOY positional projection and the calendar gating modules (Fig. \ref{fig:architecture}).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/cba_phenonet_architecture.png}
+\caption{Overview of the proposed CBA-PhenoNet architecture. Cyclical DOY encodings provide temporal priors that modulate transformer-based sequence representations through a calendar-gating mechanism before dense four-class segmentation.}
+\label{fig:architecture}
+\end{figure}
 
 \subsection{Protocol A Decoding}
 Under evaluation Protocol A, continuous sequence predictions are deterministically decoded into discrete calendar milestone days:
@@ -229,16 +244,35 @@ EOS & $7.12$ & $0.0$ & $3.91$ & $0.912$ & $63.2$ & $25.54$ \\ \bottomrule
 }
 \end{table}
 
-\paragraph{Error Analysis and Visualization:}
-Figure \ref{fig:eda_scatter} provides a visualization of Actual versus Predicted milestones. While predictions tightly follow the identity line (particularly for POS), sparse off-diagonal clusters indicate severe misclassifications. We quantify large errors as absolute deviations exceeding 30 days. For POS, only 1.5\% of predictions suffer large errors. However, SOS exhibits large errors in 11.4\% of cases (mean absolute error of these cases: 60.4 days), with the vast majority ($230/288$) being predicted prematurely (early). Similarly, EOS suffers large errors in 5.5\% of predictions (mean 79.5 days), also skewing early. These premature detections frequently correspond to anomalous early-season green-up events (e.g., weeds or cover crops) that temporarily surpass the algorithmic amplitude threshold.
+\paragraph{Qualitative Temporal Segmentation and Error Analysis:}
+Figure \ref{fig:qualitative_masks} illustrates qualitative temporal segmentation examples across representative test seasons, displaying the smoothed NDVI trajectory paired with Ground Truth and CBA-PhenoNet predicted stage masks. While standard seasonal profiles (e.g., Wheat and Corn in panels a--b) exhibit near-perfect segment alignment ($100\%$ and $95.9\%$ accuracy), premature SOS predictions frequently arise from anomalous early-season green-up events (e.g., weeds or cover crops in Barley, panel c) that temporarily surpass the algorithmic amplitude threshold. Furthermore, overwintering crops such as winter rapeseed (panel d) exhibit asymmetric profiles where subtle spectral slopes lead to premature senescence detection.
 
-\begin{figure}[h!]
+Figure \ref{fig:eda_scatter} complements these case studies with a global population-level visualization of Actual versus Predicted milestones across all 399 test seasons. While predictions tightly follow the identity line (particularly for POS), sparse off-diagonal clusters indicate severe misclassifications. We quantify large errors as absolute deviations exceeding 30 days. For POS, only 1.5\% of predictions suffer large errors. However, SOS exhibits large errors in 11.4\% of cases (mean absolute error of these cases: 60.4 days), with the vast majority ($230/288$) being predicted prematurely (early). Similarly, EOS suffers large errors in 5.5\% of predictions (mean 79.5 days), also skewing early.
+
+\begin{figure}[!htbp]
 \centering
-\includegraphics[width=\textwidth]{figures/actual_vs_predicted.png}
-\caption{Actual vs. Predicted DOY for SOS, POS, and EOS using CBA-PhenoNet. The dashed red line represents perfect prediction.}
+\includegraphics[width=0.95\textwidth]{figures/qualitative_masks_v2.png}
+\caption{Qualitative temporal segmentation examples across four representative test cases: (a) Wheat (Correct), (b) Corn (Correct), (c) Barley (Early SOS), and (d) Rapeseed (Early EOS / Difficult case). The smoothed NDVI trajectory is shown together with prominent Ground Truth and CBA-PhenoNet predicted temporal stage masks across 73 five-day timesteps ($T=73$). Vertical lines mark decoded milestones (solid: ground truth, dashed: prediction; star: POS peak).}
+\label{fig:qualitative_masks}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.92\textwidth]{figures/actual_vs_predicted.png}
+\caption{Actual versus predicted phenological milestone dates for SOS, POS, and EOS using CBA-PhenoNet. The dashed diagonal indicates perfect prediction.}
 \label{fig:eda_scatter}
 \end{figure}
 
+Furthermore, to unpack the class-level segmentation dynamics beneath the aggregate macro-F1 scores, Figure \ref{fig:confusion_matrix} presents the four-class temporal confusion matrix. The matrix confirms that Fallow---the dominant background class---achieves a near-perfect $96.8\%$ recall, heavily anchoring the overall accuracy. Vegetative and Reproductive stages exhibit more confusion ($83.5\%$ and $80.6\%$ recall, respectively), primarily confusing adjacent temporal phases (e.g., $12.4\%$ of Vegetative samples are prematurely classified as Fallow, and $9.5\%$ of Reproductive samples are delayed into Senescence). This structured, off-diagonal confusion aligns with the gradual, continuous nature of spectral green-up and senescence, where boundary thresholding inherently produces fuzzy transitions.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.75\textwidth]{figures/confusion_matrix.png}
+\caption{Temporal Segmentation Confusion Matrix for CBA-PhenoNet. Cell values display the row-normalized percentage (recall) and the absolute number of observations, illustrating adjacent-phase misclassifications.}
+\label{fig:confusion_matrix}
+\end{figure}
+
+\FloatBarrier
 \section{Discussion and Methodological Insights}
 The empirical benchmark confirms that sequence-level representations effectively capture temporal vegetation dynamics, outperforming local causal-lag predictors. However, our ablation analysis demonstrates that calendar-aware mechanisms (including periodic positional encodings and calendar gating priors) do not yield statistically distinguishable performance gains over a Standard Transformer on clean Sentinel-2 sequences. Crucially, rigorous reporting requires transparent disclosure of experimental caveats and procedural artifacts.
 

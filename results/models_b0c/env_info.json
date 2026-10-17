@@ -1,0 +1,28 @@
+{
+  "python": "3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]",
+  "torch": "2.11.0+cpu",
+  "numpy": "2.2.6",
+  "platform": "Windows-10-10.0.22621-SP0",
+  "seeds": [
+    42,
+    123,
+    2024,
+    7,
+    314,
+    0,
+    1,
+    999,
+    555,
+    77
+  ],
+  "configs": [
+    "transformer",
+    "transformer_cyclical_doy",
+    "transformer_calendar_gate",
+    "transformer_scalar_gate",
+    "cba_phenonet",
+    "cba_phenonet_residual",
+    "cba_phenonet_disentangled"
+  ],
+  "timestamp": "2026-09-28T18:11:30"
+}
