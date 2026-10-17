@@ -1,0 +1,6 @@
+season_id,fit_status,fit_rmse,eos_true_doy,eos_fit_doy,eos_fit_abs_error_days,eos_protocol_a_decoded_doy,eos_protocol_a_abs_error_days,latency_seconds
+frh01_2104193_rapeseed,FAILED:RuntimeError,nan,,,,,,1.5534638000026462
+frh01_1994782_barley,FAILED:RuntimeError,nan,,,,,,1.5363223999993352
+frh01_2103523_barley,FAILED:RuntimeError,nan,96,,,,,1.5314536000005319
+frh01_2092345_rapeseed,FAILED:RuntimeError,nan,171,,,,,1.5402981000006548
+frh01_2093132_corn,FAILED:RuntimeError,nan,,,,,,1.5710714999986521

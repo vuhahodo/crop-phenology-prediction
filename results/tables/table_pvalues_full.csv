@@ -1,0 +1,25 @@
+comparison,metric,n_seeds,mean_diff,seed_95CI,cohen_dz,p_raw,p_holm,p_bonferroni,signif_bonf,p_tost,conclusion
+transformer_cyclical_doy vs Standard,Macro-F1,10,-0.0283,"[-0.0457, -0.0135]",-1.017,0.01056,0.24282,0.25337,ns,0.81396,not detected / inconclusive
+transformer_cyclical_doy vs Standard,SOS_MAE,10,+5.0737,"[+0.9532, +10.3374]",+0.628,0.07831,1.00000,1.00000,ns,NA,not detected / inconclusive
+transformer_cyclical_doy vs Standard,POS_MAE,10,-1.1264,"[-2.1644, -0.0846]",-0.626,0.07894,1.00000,1.00000,ns,NA,not detected / inconclusive
+transformer_cyclical_doy vs Standard,EOS_MAE,10,+1.5570,"[-0.3669, +3.8658]",+0.425,0.21189,1.00000,1.00000,ns,NA,not detected / inconclusive
+transformer_calendar_gate vs Standard,Macro-F1,10,-0.0049,"[-0.0160, +0.0055]",-0.266,0.42145,1.00000,1.00000,ns,0.01480,equivalent (TOST)
+transformer_calendar_gate vs Standard,SOS_MAE,10,+0.6224,"[-2.0864, +3.6445]",+0.127,0.69744,1.00000,1.00000,ns,NA,not detected / inconclusive
+transformer_calendar_gate vs Standard,POS_MAE,10,+0.6362,"[-0.3359, +1.4964]",+0.397,0.24113,1.00000,1.00000,ns,NA,not detected / inconclusive
+transformer_calendar_gate vs Standard,EOS_MAE,10,-0.6130,"[-1.4963, +0.1585]",-0.435,0.20247,1.00000,1.00000,ns,NA,not detected / inconclusive
+transformer_scalar_gate vs Standard,Macro-F1,10,-0.0046,"[-0.0118, +0.0030]",-0.370,0.27257,1.00000,1.00000,ns,0.00190,equivalent (TOST)
+transformer_scalar_gate vs Standard,SOS_MAE,10,+0.4144,"[-1.3410, +1.9482]",+0.148,0.65091,1.00000,1.00000,ns,NA,not detected / inconclusive
+transformer_scalar_gate vs Standard,POS_MAE,10,+0.6873,"[-0.3804, +1.7155]",+0.388,0.25108,1.00000,1.00000,ns,NA,not detected / inconclusive
+transformer_scalar_gate vs Standard,EOS_MAE,10,-0.6569,"[-1.6775, +0.3778]",-0.377,0.26333,1.00000,1.00000,ns,NA,not detected / inconclusive
+cba_phenonet vs Standard,Macro-F1,10,-0.0068,"[-0.0169, +0.0031]",-0.390,0.24835,1.00000,1.00000,ns,0.01931,equivalent (TOST)
+cba_phenonet vs Standard,SOS_MAE,10,+0.1635,"[-1.7107, +2.0448]",+0.050,0.87716,1.00000,1.00000,ns,NA,not detected / inconclusive
+cba_phenonet vs Standard,POS_MAE,10,-1.3539,"[-2.2339, -0.4404]",-0.897,0.01949,0.42883,0.46781,ns,NA,not detected / inconclusive
+cba_phenonet vs Standard,EOS_MAE,10,-0.7672,"[-1.7490, +0.5773]",-0.387,0.25193,1.00000,1.00000,ns,NA,not detected / inconclusive
+cba_phenonet_residual vs Standard,Macro-F1,10,-0.0098,"[-0.0214, +0.0001]",-0.528,0.12905,1.00000,1.00000,ns,0.05832,not detected / inconclusive
+cba_phenonet_residual vs Standard,SOS_MAE,10,+0.0311,"[-2.0399, +2.4518]",+0.008,0.98033,1.00000,1.00000,ns,NA,not detected / inconclusive
+cba_phenonet_residual vs Standard,POS_MAE,10,-1.6098,"[-2.5778, -0.8124]",-1.048,0.00903,0.21669,0.21669,ns,NA,not detected / inconclusive
+cba_phenonet_residual vs Standard,EOS_MAE,10,+0.2066,"[-1.0042, +1.5708]",+0.093,0.77455,1.00000,1.00000,ns,NA,not detected / inconclusive
+cba_phenonet_disentangled vs Standard,Macro-F1,10,-0.0088,"[-0.0227, +0.0035]",-0.386,0.25316,1.00000,1.00000,ns,0.07670,not detected / inconclusive
+cba_phenonet_disentangled vs Standard,SOS_MAE,10,+0.0041,"[-1.7548, +2.1177]",+0.001,0.99702,1.00000,1.00000,ns,NA,not detected / inconclusive
+cba_phenonet_disentangled vs Standard,POS_MAE,10,-0.8115,"[-1.6555, +0.0031]",-0.577,0.10145,1.00000,1.00000,ns,NA,not detected / inconclusive
+cba_phenonet_disentangled vs Standard,EOS_MAE,10,-0.1394,"[-1.8382, +1.6388]",-0.047,0.88514,1.00000,1.00000,ns,NA,not detected / inconclusive

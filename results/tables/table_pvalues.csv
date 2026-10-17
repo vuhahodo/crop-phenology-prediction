@@ -1,0 +1,25 @@
+comparison,metric,n,mean_diff,t_stat,p_raw,p_adj,significant,family_size,test_type
+transformer_cyclical_doy vs transformer,Macro-F1,10,-0.0283,-3.216,0.010557,0.253374,no,24,paired_t_test
+transformer_cyclical_doy vs transformer,SOS_MAE,10,+5.0737,1.986,0.078306,1.000000,no,24,paired_t_test
+transformer_cyclical_doy vs transformer,POS_MAE,10,-1.1264,-1.981,0.078936,1.000000,no,24,paired_t_test
+transformer_cyclical_doy vs transformer,EOS_MAE,10,+1.5570,1.344,0.211894,1.000000,no,24,paired_t_test
+transformer_calendar_gate vs transformer,Macro-F1,10,-0.0049,-0.842,0.421448,1.000000,no,24,paired_t_test
+transformer_calendar_gate vs transformer,SOS_MAE,10,+0.6224,0.401,0.697437,1.000000,no,24,paired_t_test
+transformer_calendar_gate vs transformer,POS_MAE,10,+0.6362,1.255,0.241130,1.000000,no,24,paired_t_test
+transformer_calendar_gate vs transformer,EOS_MAE,10,-0.6130,-1.375,0.202470,1.000000,no,24,paired_t_test
+transformer_scalar_gate vs transformer,Macro-F1,10,-0.0046,-1.169,0.272568,1.000000,no,24,paired_t_test
+transformer_scalar_gate vs transformer,SOS_MAE,10,+0.4144,0.468,0.650911,1.000000,no,24,paired_t_test
+transformer_scalar_gate vs transformer,POS_MAE,10,+0.6873,1.227,0.251083,1.000000,no,24,paired_t_test
+transformer_scalar_gate vs transformer,EOS_MAE,10,-0.6569,-1.193,0.263333,1.000000,no,24,paired_t_test
+cba_phenonet vs transformer,Macro-F1,10,-0.0068,-1.234,0.248351,1.000000,no,24,paired_t_test
+cba_phenonet vs transformer,SOS_MAE,10,+0.1635,0.159,0.877156,1.000000,no,24,paired_t_test
+cba_phenonet vs transformer,POS_MAE,10,-1.3539,-2.837,0.019492,0.467815,no,24,paired_t_test
+cba_phenonet vs transformer,EOS_MAE,10,-0.7672,-1.224,0.251933,1.000000,no,24,paired_t_test
+cba_phenonet_residual vs transformer,Macro-F1,10,-0.0098,-1.671,0.129051,1.000000,no,24,paired_t_test
+cba_phenonet_residual vs transformer,SOS_MAE,10,+0.0311,0.025,0.980335,1.000000,no,24,paired_t_test
+cba_phenonet_residual vs transformer,POS_MAE,10,-1.6098,-3.314,0.009029,0.216695,no,24,paired_t_test
+cba_phenonet_residual vs transformer,EOS_MAE,10,+0.2066,0.295,0.774555,1.000000,no,24,paired_t_test
+cba_phenonet_disentangled vs transformer,Macro-F1,10,-0.0088,-1.221,0.253159,1.000000,no,24,paired_t_test
+cba_phenonet_disentangled vs transformer,SOS_MAE,10,+0.0041,0.004,0.997024,1.000000,no,24,paired_t_test
+cba_phenonet_disentangled vs transformer,POS_MAE,10,-0.8115,-1.824,0.101452,1.000000,no,24,paired_t_test
+cba_phenonet_disentangled vs transformer,EOS_MAE,10,-0.1394,-0.149,0.885144,1.000000,no,24,paired_t_test

@@ -1,0 +1,2 @@
+config,seed,val_f1,n_epochs,train_seconds
+cba_phenonet_disentangled,77,0.926956,146,574.9

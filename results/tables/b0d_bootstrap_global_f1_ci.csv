@@ -1,0 +1,7 @@
+config,mean_diff_f1_global,ci_95_lo,ci_95_hi,cohens_d_seed
+transformer_cyclical_doy,-0.028135,-0.034344,-0.021512,-1.017
+transformer_calendar_gate,-0.004984,-0.008881,-0.00111,-0.2664
+transformer_scalar_gate,-0.004624,-0.00834,-0.001137,-0.3696
+cba_phenonet,-0.006603,-0.013188,0.000157,-0.3903
+cba_phenonet_residual,-0.009723,-0.015879,-0.003233,-0.5284
+cba_phenonet_disentangled,-0.008821,-0.014512,-0.002739,-0.3861

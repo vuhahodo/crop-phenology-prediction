@@ -1,0 +1,7 @@
+config,mean_diff_f1,ci_95_lo,ci_95_hi,cohens_d_seed,n_seasons,n_seeds,n_bootstrap
+transformer_cyclical_doy,-0.035379,-0.042233,-0.028486,-1.017,399,10,2000
+transformer_calendar_gate,-0.006116,-0.01037,-0.002091,-0.2664,399,10,2000
+transformer_scalar_gate,-0.00729,-0.011557,-0.003306,-0.3696,399,10,2000
+cba_phenonet,-0.013096,-0.019902,-0.006162,-0.3903,399,10,2000
+cba_phenonet_residual,-0.016321,-0.022986,-0.009094,-0.5284,399,10,2000
+cba_phenonet_disentangled,-0.015134,-0.021335,-0.008737,-0.3861,399,10,2000

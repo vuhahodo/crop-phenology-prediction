@@ -1,0 +1,2 @@
+n_seasons,n_converged,convergence_rate,fit_rmse_mean,fit_rmse_median,fit_eos_reference_n,fit_eos_mae_days,protocol_a_eos_detected,protocol_a_eos_mae_days,latency_total_seconds,latency_mean_ms_per_season
+399,378,0.9473684210526315,0.07725166863109122,0.07356317179217742,219,104.71689497716895,110,161.72727272727272,50.20158100000117,125.8184987468701
